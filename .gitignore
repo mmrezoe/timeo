@@ -1,4 +1,7 @@
 timeo
+/data/
+.env
+/letsencrypt/acme.json
 
 # SQLite database
 *.db
