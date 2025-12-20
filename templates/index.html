@@ -406,6 +406,88 @@
             </div>
         </div>
 
+        <!-- Edit Timer Modal -->
+        <div
+            id="editTimerModal"
+            class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+        >
+            <div class="bg-dark-secondary rounded-lg p-6 w-full max-w-md mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-white">Edit Timer</h3>
+                    <button
+                        onclick="closeEditTimerModal()"
+                        class="text-gray-400 hover:text-white"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-2"
+                            >Project</label
+                        >
+                        <div
+                            id="editTimerProject"
+                            class="text-white bg-dark-tertiary rounded-lg px-4 py-3 border border-gray-600"
+                        ></div>
+                    </div>
+
+                    <div>
+                        <label
+                            class="block text-sm font-medium text-gray-300 mb-2"
+                            >Description</label
+                        >
+                        <div
+                            id="editTimerDescription"
+                            class="text-white bg-dark-tertiary rounded-lg px-4 py-3 border border-gray-600 text-gray-400"
+                        ></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-2"
+                                >Start Time</label
+                            >
+                            <input
+                                type="datetime-local"
+                                id="editStartTime"
+                                class="w-full bg-dark-tertiary border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-accent-purple focus:ring-2 focus:ring-accent-purple/20"
+                            />
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-300 mb-2"
+                                >End Time</label
+                            >
+                            <input
+                                type="datetime-local"
+                                id="editEndTime"
+                                class="w-full bg-dark-tertiary border border-gray-600 rounded-lg px-4 py-3 text-white focus:border-accent-purple focus:ring-2 focus:ring-accent-purple/20"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button
+                        onclick="saveTimerChanges()"
+                        class="flex-1 btn-success px-4 py-2 rounded-lg font-medium"
+                    >
+                        Save Changes
+                    </button>
+                    <button
+                        onclick="closeEditTimerModal()"
+                        class="flex-1 btn-secondary px-4 py-2 rounded-lg font-medium"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Scripts -->
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
@@ -415,5 +497,12 @@
             Chart.defaults.backgroundColor = "rgba(168, 85, 247, 0.1)";
         </script>
         <script src="/static/js/script.js"></script>
+        <script src="/static/js/timer-edit.js"></script>
+        <script>
+            // Initialize page to correct section on load
+            document.addEventListener("DOMContentLoaded", () => {
+                initializePageSection();
+            });
+        </script>
     </body>
 </html>

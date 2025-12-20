@@ -21,6 +21,8 @@ func SetupRoutes(app *fiber.App) {
 	app.Get("/timers/today", handlers.GetTodayTimers)
 	app.Get("/timers/recent", handlers.GetRecentTimers)
 	app.Delete("/timers/:id", handlers.DeleteTimer)
+	app.Put("/timers/:id", handlers.UpdateTimer)
+	app.Post("/timers/:id/restart", handlers.RestartTimer)
 
 	// Goals routes
 	app.Get("/goals", handlers.GetGoals)
