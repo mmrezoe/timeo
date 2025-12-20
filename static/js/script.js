@@ -4,12 +4,24 @@ let currentTimerStartTime = null;
 let reportChart = null;
 let elapsedTimeInterval = null;
 
+// Page persistence
+function saveCurrentSection(sectionName) {
+  localStorage.setItem("timeo_current_section", sectionName);
+}
+
+function getCurrentSection() {
+  return localStorage.getItem("timeo_current_section") || "home";
+}
+
 // Show/Hide sections
 function showSection(sectionName) {
   document.querySelectorAll(".section").forEach((section) => {
     section.classList.add("hidden");
   });
   document.getElementById(sectionName).classList.remove("hidden");
+
+  // Save current section for persistence
+  saveCurrentSection(sectionName);
 
   // Load data when section is shown
   if (sectionName === "home") {
@@ -368,12 +380,13 @@ async function startTimer() {
       elapsedTimeInterval = setInterval(updateElapsedTime, 1000);
 
       // Load data after a short delay to ensure backend processing is complete
+      // Use a longer delay to avoid race conditions with duplicate timers
       setTimeout(() => {
         loadRecentTimers();
         loadHomeData();
         loadLast7DaysData();
         loadGoalsList();
-      }, 300);
+      }, 500);
     } else {
       alert(data.error || "Error starting timer");
       // Re-enable button on error
@@ -443,13 +456,20 @@ async function stopTimer() {
         stopBtn.innerHTML = "⏹️ Stop";
       }
 
+      // Clear the container first to prevent duplicate display
+      const container = document.getElementById("recent_timers");
+      if (container) {
+        container.innerHTML = "";
+      }
+
       // Load data after a short delay to ensure backend processing is complete
+      // Use a longer delay to avoid race conditions with duplicate timers
       setTimeout(() => {
         loadRecentTimers();
         loadHomeData();
         loadLast7DaysData();
         loadGoalsList();
-      }, 300);
+      }, 800);
     } else {
       // Don't show alerts for expected conditions
       const errorMsg = data.error || "Error stopping timer";
@@ -558,7 +578,24 @@ async function loadRecentTimers() {
       projectsContainer.className = "space-y-4";
 
       if (dateGroup.projects && Array.isArray(dateGroup.projects)) {
+        // Deduplicate projects by name to prevent duplicate project display
+        const seenProjects = new Map();
+        const uniqueProjects = [];
+        
         dateGroup.projects.forEach((project) => {
+          const projectName = project.project_name;
+          if (seenProjects.has(projectName)) {
+            // Merge timers from duplicate project
+            const existingProject = seenProjects.get(projectName);
+            existingProject.timers = [...existingProject.timers, ...(project.timers || [])];
+            existingProject.total_hours += project.total_hours || 0;
+          } else {
+            seenProjects.set(projectName, { ...project });
+            uniqueProjects.push(seenProjects.get(projectName));
+          }
+        });
+
+        uniqueProjects.forEach((project) => {
           const projectDiv = document.createElement("div");
           projectDiv.className =
             "card p-6 border-l-4 border-accent-purple cursor-pointer hover:shadow-lg transition-all";
@@ -588,10 +625,22 @@ async function loadRecentTimers() {
           timersList.className = "timer-details space-y-3 mt-4 hidden";
 
           if (project.timers && Array.isArray(project.timers)) {
-            project.timers.forEach((timer) => {
+            // Deduplicate timers by ID to prevent duplicates
+            const seenTimerIds = new Set();
+            const uniqueTimers = project.timers.filter((timer) => {
               // Skip active timers (additional safety check)
-              if (timer.is_active) return;
+              if (timer.is_active) return false;
+              // Deduplicate by timer ID
+              if (timer.id && seenTimerIds.has(timer.id)) {
+                return false;
+              }
+              if (timer.id) {
+                seenTimerIds.add(timer.id);
+              }
+              return true;
+            });
 
+            uniqueTimers.forEach((timer) => {
               const timerItem = document.createElement("div");
               timerItem.className =
                 "bg-dark-tertiary p-4 rounded-lg border border-gray-600 flex justify-between items-start";
@@ -627,6 +676,10 @@ async function loadRecentTimers() {
                 endTimeText = ` - ${endTime}`;
               }
 
+              // Escape strings for safe use in HTML/JS
+              const safeProjectName = (project.project_name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
+              const safeDescription = (timer.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ');
+              
               timerItem.innerHTML = `
                                 <div class="flex-1">
                                     <div class="font-medium text-white mb-1">${timer.description || "⚡ No description"}</div>
@@ -634,6 +687,11 @@ async function loadRecentTimers() {
                                 </div>
                                 <div class="flex items-center gap-3 ml-4">
                                     <span class="text-accent-purple font-semibold time-display">${timerTimeDisplay}</span>
+                                    ${timer.id && timer.end_time ? `<button onclick="showEditTimerModal(${timer.id}, '${safeProjectName}', '${safeDescription}', '${timer.start_time}', '${timer.end_time}')"
+                                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                                        title="Edit Timer">
+                                        ✏️ Edit
+                                    </button>` : ''}
                                     <button onclick="deleteTimer(${timer.id})"
                                         class="btn-danger px-3 py-1 rounded text-xs">
                                         🗑️

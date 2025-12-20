@@ -419,6 +419,125 @@ func DeleteTimer(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "Timer deleted successfully"})
 }
 
+func UpdateTimer(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Timer ID is required"})
+	}
+
+	type Request struct {
+		StartTime string `json:"start_time"`
+		EndTime   string `json:"end_time"`
+	}
+
+	var body Request
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid request data"})
+	}
+
+	// Parse the times
+	startTime, err := time.Parse("2006-01-02T15:04", body.StartTime)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid start time format"})
+	}
+
+	endTime, err := time.Parse("2006-01-02T15:04", body.EndTime)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid end time format"})
+	}
+
+	// Validate that end time is after start time
+	if !endTime.After(startTime) {
+		return c.Status(400).JSON(fiber.Map{"error": "End time must be after start time"})
+	}
+
+	// Check if timer exists and is completed
+	var currentEndTime sql.NullString
+	var projectID int
+	err = models.DB.QueryRow("SELECT end_time, project_id FROM timers WHERE id = ?", id).Scan(&currentEndTime, &projectID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Timer not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// Don't allow editing active timers
+	if !currentEndTime.Valid {
+		return c.Status(400).JSON(fiber.Map{"error": "Cannot edit active timer. Please stop it first."})
+	}
+
+	// Update the timer
+	// Note: SQLite stores timestamps as strings, so we format them properly
+	// Use the parsed times directly - SQLite will handle them correctly
+	_, err = models.DB.Exec(
+		"UPDATE timers SET start_time = ?, end_time = ? WHERE id = ?",
+		startTime.Format("2006-01-02 15:04:05"), endTime.Format("2006-01-02 15:04:05"), id,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to update timer: " + err.Error()})
+	}
+
+	// Update goal progress after editing timer - run in background
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Log the error but don't affect the main response
+			}
+		}()
+		updateGoalProgressForProject(projectID)
+	}()
+
+	return c.JSON(fiber.Map{"status": "Timer updated successfully"})
+}
+
+func RestartTimer(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if id == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Timer ID is required"})
+	}
+
+	// Get timer details
+	var projectID int
+	var description sql.NullString
+	var endTime sql.NullString
+	err := models.DB.QueryRow("SELECT project_id, description, end_time FROM timers WHERE id = ?", id).Scan(&projectID, &description, &endTime)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(404).JSON(fiber.Map{"error": "Timer not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	// Don't allow restarting active timers
+	if !endTime.Valid {
+		return c.Status(400).JSON(fiber.Map{"error": "Timer is already active"})
+	}
+
+	// Check if there's already an active timer
+	var activeCount int
+	err = models.DB.QueryRow("SELECT COUNT(*) FROM timers WHERE end_time IS NULL").Scan(&activeCount)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error"})
+	}
+
+	if activeCount > 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "Another timer is already running. Please stop it first."})
+	}
+
+	// Create new timer with same project and description
+	res, err := models.DB.Exec(
+		"INSERT INTO timers(project_id, description, start_time) VALUES (?, ?, ?)",
+		projectID, description.String, time.Now(),
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to restart timer"})
+	}
+
+	newTimerID, _ := res.LastInsertId()
+	return c.JSON(fiber.Map{"status": "Timer restarted successfully", "timer_id": newTimerID})
+}
+
 func GetRecentTimers(c *fiber.Ctx) error {
 	// Get current local date for comparison
 	now := time.Now()

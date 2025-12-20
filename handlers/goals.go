@@ -74,6 +74,7 @@ func GetGoals(c *fiber.Ctx) error {
 
 func calculateStreak(goalID int, targetMinutes int) int {
 	today := time.Now().Format("2006-01-02")
+	todayTime, _ := time.Parse("2006-01-02", today)
 
 	// Check if today's goal is achieved first
 	var todayMinutes float64
@@ -88,32 +89,33 @@ func calculateStreak(goalID int, targetMinutes int) int {
 	}
 
 	// Count consecutive achieved days backwards from today
-	var streak int
-	rows, err := models.DB.Query(`
-		SELECT achievement_date, minutes_achieved
-		FROM goal_achievements
-		WHERE goal_id = ? AND achievement_date <= ?
-		ORDER BY achievement_date DESC
-	`, goalID, today)
+	// We need to check that days are consecutive (no gaps)
+	var streak int = 1 // Today is achieved, so streak starts at 1
+	currentDate := todayTime
 
-	if err != nil {
-		return 0
-	}
-	defer rows.Close()
+	for {
+		// Move to previous day
+		currentDate = currentDate.AddDate(0, 0, -1)
+		dateStr := currentDate.Format("2006-01-02")
 
-	for rows.Next() {
-		var dateStr string
 		var minutes float64
+		err := models.DB.QueryRow(`
+			SELECT COALESCE(minutes_achieved, 0)
+			FROM goal_achievements
+			WHERE goal_id = ? AND achievement_date = ?
+		`, goalID, dateStr).Scan(&minutes)
 
-		if err := rows.Scan(&dateStr, &minutes); err != nil {
-			continue
+		// If no record found for this date, streak is broken
+		if err != nil {
+			break
 		}
 
-		if minutes >= float64(targetMinutes) {
-			streak++
-		} else {
-			break // Break on first non-achieved day
+		// If this day didn't achieve the goal, streak is broken
+		if minutes < float64(targetMinutes) {
+			break
 		}
+
+		streak++
 	}
 
 	return streak
