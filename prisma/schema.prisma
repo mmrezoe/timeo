@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // Use environment variable so the DB path can be configured.
+  url = env("DATABASE_URL")
+}
+
+/// Full schema for `timeo` personal time-tracking app.
+/// Models: User (optional), Project, TimeEntry, Goal, GoalProject (join), GoalDayStatus (daily/"streak" status)
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String?
+  email     String?   @unique
+  createdAt DateTime  @default(now())
+
+  projects  Project[]
+  goals     Goal[]
+}
+
+model Project {
+  id        Int         @id @default(autoincrement())
+  name      String
+  color     String?
+  user      User?       @relation(fields: [userId], references: [id])
+  userId    Int?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  entries   TimeEntry[]
+  goals     Goal[]
+
+  @@index([userId])
+}
+
+model TimeEntry {
+  id         Int       @id @default(autoincrement())
+  project    Project   @relation(fields: [projectId], references: [id])
+  projectId  Int
+  start      DateTime
+  end        DateTime?
+  // duration in minutes; nullable and can be maintained by the application
+  duration   Int?
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([projectId, start])
+}
+
+model Goal {
+  id               Int               @id @default(autoincrement())
+  project          Project           @relation(fields: [projectId], references: [id])
+  projectId        Int
+  minMinutesPerDay Int               // threshold in minutes (e.g., 120 = 2 hours)
+  user             User?             @relation(fields: [userId], references: [id])
+  userId           Int?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  dayStatuses      GoalDayStatus[]
+}
+
+model GoalDayStatus {
+  id        Int        @id @default(autoincrement())
+  goal      Goal       @relation(fields: [goalId], references: [id])
+  goalId    Int
+  // store the day's date at UTC midnight for consistency
+  date      DateTime
+  status    String     // 'PENDING' | 'COMPLETED' | 'IN_PROGRESS'
+  minutes   Int        // cached minutes for the day (helps fast UI/streaks)
+  createdAt DateTime   @default(now())
+
+  @@unique([goalId, date])
+  @@index([goalId, date])
+}
+
