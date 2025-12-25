@@ -42,5 +42,5 @@ jobs:
           context: .
           push: true
           tags: |
-            username/timeo:${{ env.VERSION }}
-            username/timeo:latest
+            mmrezoe/timeo:${{ env.VERSION }}
+            mmrezoe/timeo:latest

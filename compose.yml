@@ -35,7 +35,7 @@ services:
       - "traefik.http.routers.traefik.middlewares=traefik-auth"
 
   timeo:
-    build: .
+    image: mmrezoe/timeo:latest
     container_name: timeo
     ports:
       - "3000:3000"
