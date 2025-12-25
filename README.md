@@ -81,12 +81,69 @@ A beautiful, modern time tracking application built with Next.js, featuring goal
 
 ## 🚀 Installation
 
-### Prerequisites
+### 🐳 Docker Installation (Recommended)
+
+The easiest way to run Timeo is using Docker. No Node.js installation required!
+
+#### Prerequisites
+
+- **Docker** 20.10 or higher
+- **Docker Compose** 2.0 or higher
+
+#### Quick Start with Docker
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/yourusername/timeo.git
+cd timeo
+```
+
+2. **Start with Docker Compose**
+
+```bash
+docker-compose up -d
+```
+
+3. **Access the application**
+
+Navigate to [http://localhost:3000](http://localhost:3000)
+
+#### Using Makefile (Optional)
+
+For convenience, use the provided Makefile:
+
+```bash
+# Install and start
+make install
+
+# View logs
+make logs
+
+# Stop
+make down
+
+# Backup database
+make backup
+
+# View all commands
+make help
+```
+
+📖 **See [DOCKER.md](DOCKER.md) for detailed Docker documentation**
+
+---
+
+### 💻 Manual Installation
+
+If you prefer to run without Docker:
+
+#### Prerequisites
 
 - **Node.js** 16.x or higher
 - **npm** or **yarn** package manager
 
-### Quick Start
+#### Quick Start
 
 1. **Clone the repository**
 

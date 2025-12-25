@@ -1,0 +1,63 @@
+# version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.6
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.myresolver.acme.email=${EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.tls.certresolver=myresolver"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.middlewares.traefik-auth.basicauth.users=${user}:${pass}"
+      - "traefik.http.routers.traefik.middlewares=traefik-auth"
+
+  timeo:
+    build: .
+    container_name: timeo
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/prod.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - app_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=app_net"
+      - "traefik.http.routers.timeo.rule=Host(`timeo.${DOMAIN}`)"
+      - "traefik.http.routers.timeo.entrypoints=websecure"
+      - "traefik.http.routers.timeo.tls.certresolver=myresolver"
+      - "traefik.http.routers.timeo.service=timeo-service"
+      - "traefik.http.services.timeo-service.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.timeo-auth.basicauth.users=${user}:${pass}"
+      - "traefik.http.routers.timeo.middlewares=timeo-auth"
+networks:
+  app_net:
+    name: app_net
+    external: true

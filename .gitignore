@@ -3,6 +3,10 @@ timeo
 .env
 /letsencrypt/acme.json
 
+# Docker
+backups/
+*.db-backup
+
 # Editor/IDE
 .idea/
 .vscode/
