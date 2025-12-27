@@ -105,17 +105,19 @@ export default function Timer() {
     try {
       setIsRunning(false);
 
-      // Calculate actual start and end times
-      const endTime = new Date();
-      const calculatedStartTime = new Date(endTime.getTime() - time * 1000);
+      // Use the actual start time from when timer was started
+      if (!startTime) {
+        throw new Error("Start time not found");
+      }
 
-      // Create the time entry
+      // Create the time entry with actual start time
       const createResponse = await fetch("/api/timer/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: selectedProject,
           note: description || "",
+          start: startTime.toISOString(),
         }),
       });
 

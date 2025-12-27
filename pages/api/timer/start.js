@@ -5,14 +5,14 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end();
   }
-  const { projectId, note } = req.body;
+  const { projectId, note, start } = req.body;
   if (!projectId) return res.status(400).json({ error: 'projectId required' });
 
   // optional: stop previous running entry to enforce single running timer
   await prisma.timeEntry.updateMany({ where: { end: null }, data: { end: new Date() } });
 
   const entry = await prisma.timeEntry.create({
-    data: { projectId: Number(projectId), start: new Date(), note }
+    data: { projectId: Number(projectId), start: start ? new Date(start) : new Date(), note }
   });
   res.status(201).json(entry);
 }
