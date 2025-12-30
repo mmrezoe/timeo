@@ -2,28 +2,69 @@ import { useEffect, useState } from "react";
 import ProjectsList from "../components/ProjectsList";
 
 export default function Timer() {
-  const [time, setTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [selectedProject, setSelectedProject] = useState("");
   const [description, setDescription] = useState("");
   const [projects, setProjects] = useState([]);
   const [startTime, setStartTime] = useState(null);
+  const [runningEntryId, setRunningEntryId] = useState(null);
   const [todayProjects, setTodayProjects] = useState([]);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [projectName, setProjectName] = useState("");
   const [projectColor, setProjectColor] = useState("#6366f1");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
     fetchProjects();
     fetchTodayProjects();
+    checkRunningTimer();
   }, []);
+
+  const checkRunningTimer = async () => {
+    try {
+      const response = await fetch("/api/timer/running");
+      const running = await response.json();
+      
+      if (running) {
+        setRunningEntryId(running.id);
+        setSelectedProject(running.projectId.toString());
+        setDescription(running.note || "");
+        setStartTime(new Date(running.start));
+        setIsRunning(true);
+        setCurrentTime(new Date());
+      }
+    } catch (error) {
+      console.error("Error checking running timer:", error);
+    }
+  };
+
+  const updateRunningEntryNote = async (note) => {
+    if (!runningEntryId) return;
+    
+    // Debounce: wait 1 second after user stops typing
+    if (updateRunningEntryNote.timeout) {
+      clearTimeout(updateRunningEntryNote.timeout);
+    }
+    
+    updateRunningEntryNote.timeout = setTimeout(async () => {
+      try {
+        await fetch(`/api/entries/${runningEntryId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note }),
+        });
+      } catch (error) {
+        console.error("Error updating entry note:", error);
+      }
+    }, 1000);
+  };
 
   useEffect(() => {
     let interval;
     if (isRunning) {
       interval = setInterval(() => {
-        setTime((prevTime) => prevTime + 1);
+        setCurrentTime(new Date());
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -82,57 +123,68 @@ export default function Timer() {
     return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleStart = () => {
+  const getElapsedTime = () => {
+    if (!startTime) return 0;
+    const now = new Date();
+    return Math.floor((now.getTime() - startTime.getTime()) / 1000);
+  };
+
+  const handleStart = async () => {
     if (!selectedProject) {
       alert("Please select a project first");
       return;
     }
-    setIsRunning(true);
-    setStartTime(new Date());
+
+    try {
+      const now = new Date();
+      
+      // Create a time entry with end=null (running entry)
+      const response = await fetch("/api/timer/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: selectedProject,
+          note: description || "",
+          start: now.toISOString(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to start timer");
+      }
+
+      const entry = await response.json();
+      setRunningEntryId(entry.id);
+      setIsRunning(true);
+      setStartTime(now);
+      setCurrentTime(now);
+    } catch (error) {
+      console.error("Error starting timer:", error);
+      alert("Error starting timer. Please try again.");
+    }
   };
 
   const handleStop = async () => {
-    if (time === 0) {
-      alert("Timer must be greater than 0");
+    if (!runningEntryId) {
+      alert("No running timer found");
       return;
     }
 
-    if (!selectedProject) {
-      alert("Please select a project");
+    const elapsedSeconds = getElapsedTime();
+    if (elapsedSeconds <= 0) {
+      alert("Timer must be greater than 0");
       return;
     }
 
     try {
       setIsRunning(false);
 
-      // Use the actual start time from when timer was started
-      if (!startTime) {
-        throw new Error("Start time not found");
-      }
-
-      // Create the time entry with actual start time
-      const createResponse = await fetch("/api/timer/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: selectedProject,
-          note: description || "",
-          start: startTime.toISOString(),
-        }),
-      });
-
-      if (!createResponse.ok) {
-        throw new Error("Failed to create time entry");
-      }
-
-      const entry = await createResponse.json();
-
-      // Stop the timer immediately
+      // Stop the running entry
       const stopResponse = await fetch("/api/timer/stop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          entryId: entry.id,
+          entryId: runningEntryId,
         }),
       });
 
@@ -141,15 +193,16 @@ export default function Timer() {
       }
 
       // Reset everything
-      setTime(0);
       setDescription("");
       setStartTime(null);
+      setRunningEntryId(null);
+      setCurrentTime(new Date());
 
       // Refresh today's projects
       fetchTodayProjects();
     } catch (error) {
-      console.error("Error saving entry:", error);
-      alert("Error saving time entry. Please try again.");
+      console.error("Error stopping timer:", error);
+      alert("Error stopping timer. Please try again.");
       setIsRunning(false);
     }
   };
@@ -276,7 +329,7 @@ export default function Timer() {
                 ${isRunning ? "text-gradient-primary animate-pulse" : "text-text-primary"}
               `}
             >
-              {formatTime(time)}
+              {formatTime(getElapsedTime())}
             </div>
             <div className="flex items-center justify-center space-x-2">
               <div
@@ -293,14 +346,14 @@ export default function Timer() {
 
           {/* Project Selection */}
           <div className="space-y-4 mb-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-4">
               <label className="block text-text-secondary text-sm font-medium">
                 Select Project
               </label>
               <button
                 onClick={openAddProjectModal}
                 disabled={isRunning}
-                className="text-accent-primary hover:text-accent-primary-hover transition-colors text-sm font-medium flex items-center space-x-1"
+                className="text-accent-primary hover:text-accent-primary-hover transition-colors text-sm font-medium flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg
                   className="w-4 h-4"
@@ -318,71 +371,164 @@ export default function Timer() {
                 <span>New Project</span>
               </button>
             </div>
-            <div className="flex items-center space-x-2">
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="input-premium flex-1"
-                disabled={isRunning}
-              >
-                <option value="">Choose a project...</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-              {selectedProject && !isRunning && (
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() =>
-                      openEditProjectModal(
-                        projects.find(
-                          (p) => p.id === parseInt(selectedProject),
-                        ),
-                      )
-                    }
-                    className="icon-btn text-text-secondary hover:text-accent-primary"
-                    title="Edit project"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+            
+            {/* Project Grid */}
+            {projects.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-dark-border rounded-xl">
+                <p className="text-text-secondary mb-4">No projects yet</p>
+                <button
+                  onClick={openAddProjectModal}
+                  className="btn-primary"
+                >
+                  Create Your First Project
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {projects.map((project) => {
+                  const isSelected = selectedProject === project.id.toString();
+                  const projectColor = project.color || "#6366f1";
+                  
+                  return (
+                    <div
+                      key={project.id}
+                      onClick={() => {
+                        if (!isRunning) {
+                          setSelectedProject(project.id.toString());
+                        }
+                      }}
+                      className={`
+                        relative group cursor-pointer rounded-xl p-4 transition-all duration-300
+                        ${isSelected
+                          ? "ring-2 ring-offset-2 ring-offset-dark-surface shadow-glow-md scale-105"
+                          : "hover:scale-105 hover:shadow-glow-sm"
+                        }
+                        ${isRunning ? "opacity-50 cursor-not-allowed" : ""}
+                      `}
+                      style={{
+                        backgroundColor: isSelected
+                          ? `${projectColor}20`
+                          : "transparent",
+                        border: isSelected
+                          ? `2px solid ${projectColor}`
+                          : "1px solid transparent",
+                      }}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                      {/* Background gradient effect */}
+                      <div
+                        className="absolute inset-0 rounded-xl opacity-10 group-hover:opacity-20 transition-opacity"
+                        style={{
+                          background: `linear-gradient(135deg, ${projectColor}, ${projectColor}dd)`,
+                        }}
                       />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() =>
-                      handleDeleteProject(parseInt(selectedProject))
-                    }
-                    className="icon-btn text-text-secondary hover:text-accent-danger"
-                    title="Delete project"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
+                      
+                      {/* Content */}
+                      <div className="relative z-10">
+                        {/* Color indicator */}
+                        <div
+                          className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 shadow-glow-sm transition-transform group-hover:scale-110"
+                          style={{
+                            background: `linear-gradient(135deg, ${projectColor}, ${projectColor}dd)`,
+                          }}
+                        >
+                          <svg
+                            className="w-6 h-6 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                            />
+                          </svg>
+                        </div>
+                        
+                        {/* Project name */}
+                        <h3
+                          className="text-sm font-semibold text-text-primary truncate mb-1"
+                          style={{
+                            color: isSelected ? projectColor : undefined,
+                          }}
+                        >
+                          {project.name}
+                        </h3>
+                        
+                        {/* Selected indicator */}
+                        {isSelected && (
+                          <div className="flex items-center space-x-1 text-xs" style={{ color: projectColor }}>
+                            <svg
+                              className="w-4 h-4"
+                              fill="currentColor"
+                              viewBox="0 0 20 20"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>Selected</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Action buttons (on hover) */}
+                      {!isRunning && (
+                        <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditProjectModal(project);
+                            }}
+                            className="p-1.5 rounded-lg bg-dark-surface hover:bg-dark-elevated border border-dark-border transition-colors"
+                            title="Edit project"
+                          >
+                            <svg
+                              className="w-3.5 h-3.5 text-text-secondary hover:text-accent-primary"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteProject(project.id);
+                            }}
+                            className="p-1.5 rounded-lg bg-dark-surface hover:bg-dark-elevated border border-dark-border transition-colors"
+                            title="Delete project"
+                          >
+                            <svg
+                              className="w-3.5 h-3.5 text-text-secondary hover:text-accent-danger"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Description Input */}
@@ -393,10 +539,14 @@ export default function Timer() {
             <input
               type="text"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                if (isRunning && runningEntryId) {
+                  updateRunningEntryNote(e.target.value);
+                }
+              }}
               placeholder="Enter task description..."
               className="input-premium"
-              disabled={isRunning}
             />
           </div>
 

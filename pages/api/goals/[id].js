@@ -14,6 +14,9 @@ export default async function handler(req, res) {
     });
     res.json(updated);
   } else if (req.method === 'DELETE') {
+    // Delete dayStatuses first (cascade delete)
+    await prisma.goalDayStatus.deleteMany({ where: { goalId: Number(id) } });
+    // Then delete the goal
     await prisma.goal.delete({ where: { id: Number(id) } });
     res.status(204).end();
   } else {

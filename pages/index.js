@@ -87,8 +87,17 @@ export default function Home() {
               };
             }
 
-            const duration = entry.duration || 0;
-            projectsMap[entry.projectId].totalTime += duration * 60;
+            // Calculate duration from start and end times
+            let duration = 0;
+            if (entry.start && entry.end) {
+              const startTime = new Date(entry.start);
+              const endTime = new Date(entry.end);
+              duration = Math.floor((endTime.getTime() - startTime.getTime()) / 60000); // duration in minutes
+            } else if (entry.duration) {
+              duration = entry.duration;
+            }
+            
+            projectsMap[entry.projectId].totalTime += duration * 60; // convert to seconds
             projectsMap[entry.projectId].entries.push({
               id: entry.id,
               startTime: entry.start,
@@ -298,7 +307,7 @@ export default function Home() {
                         <div className="text-2xl text-text-secondary">days</div>
                       </div>
                       {currentStreak > 0 && !isTodayCompleted && (
-                        <div className="mt-2 text-yellow-500 text-xs font-medium flex items-center justify-center space-x-1">
+                        <div className="mt-2 text-white text-xs font-medium flex items-center justify-center space-x-1">
                           <svg
                             className="w-3.5 h-3.5"
                             fill="none"
@@ -316,7 +325,7 @@ export default function Home() {
                         </div>
                       )}
                       {currentStreak > 0 && isTodayCompleted && (
-                        <div className="mt-2 text-accent-secondary text-sm font-medium">
+                        <div className="mt-2 text-white text-sm font-medium">
                           Keep it going! 💪
                         </div>
                       )}

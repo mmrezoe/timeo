@@ -1,553 +1,205 @@
-<div align="center">
-
 # ⏱️ Timeo
 
-### Personal Time Tracking & Productivity Management System
+A simple and beautiful personal time tracking and productivity management system.
 
-A beautiful, modern time tracking application built with Next.js, featuring goal management, streaks, and comprehensive analytics.
-
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-13-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-18-blue?style=flat-square&logo=react)](https://reactjs.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38B2AC?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
 
-[Features](#-features) • [Demo](#-demo) • [Installation](#-installation) • [Usage](#-usage) • [API](#-api) • [Tech Stack](#-tech-stack) • [Contributing](#-contributing)
+## ✨ Features
 
-</div>
+- ⏲️ **Live Timer** - Track time with a simple start/stop interface
+- 📊 **Analytics Dashboard** - View daily and weekly statistics
+- 🎯 **Goal Management** - Set daily goals and track streaks
+- 📁 **Project Management** - Organize work with color-coded projects
+- 📈 **Detailed Reports** - Advanced charts and statistics
+- 🔥 **Streak System** - Build consistent habits with streak tracking
+- 🌙 **Dark Theme** - Beautiful UI optimized for long work sessions
 
----
+## 🚀 Quick Start
 
-## 📖 Overview
-
-**Timeo** is a full-featured personal time tracking application designed to help you monitor your productivity, build consistent work habits, and gain insights into how you spend your time. Inspired by tools like Toggl Track, Timeo offers a clean, intuitive interface with powerful features for project management, goal tracking, and detailed analytics.
-
-### ✨ Key Highlights
-
-- 🎯 **Smart Goal Tracking** - Set daily goals and track your streaks with visual progress indicators
-- ⏲️ **Real-time Timer** - Track time with a simple start/stop interface
-- 📊 **Advanced Analytics** - Visualize your productivity with beautiful charts and reports
-- 🎨 **Customizable Projects** - Organize work with color-coded projects
-- 🔥 **Streak System** - Build consistency with streak tracking and provisional streak indicators
-- 📱 **Responsive Design** - Works seamlessly on desktop, tablet, and mobile
-- 🌙 **Dark Mode** - Beautiful dark theme optimized for long working hours
-- 🚀 **Fast & Lightweight** - Built with performance in mind using Next.js and SQLite
-
----
-
-## 🎯 Features
-
-### 🏠 Dashboard
-- **Quick Stats Overview** - Today's hours, weekly hours, active projects, and total entries
-- **10-Day History** - Visual timeline of your recent work
-- **Goals & Streaks** - Track daily goals with fire emoji streaks 🔥
-- **14-Day Visual Streak** - Interactive calendar showing your progress
-
-### ⏱️ Timer
-- **Live Timer** - Real-time countdown with HH:MM:SS display
-- **Project Selection** - Quick dropdown to select projects
-- **Entry Description** - Add notes to your time entries
-- **Today's Activity** - Expandable list showing all entries for the day
-- **Entry Management** - Edit or delete time entries with ease
-
-### 📁 Projects
-- **Project Library** - View all projects with today's time and entry counts
-- **CRUD Operations** - Create, read, update, and delete projects
-- **Color Coding** - 15 beautiful color options for visual organization
-- **Complete Deletion** - Remove projects with all associated data
-
-### 🎯 Goals
-- **Daily Targets** - Set minimum minutes per day for each project
-- **Streak Tracking** - Build and maintain consistency streaks
-- **Provisional Streaks** - See your streak even if today isn't complete yet 🪵
-- **Progress Indicators** - Visual bars showing daily goal completion
-- **Goal Management** - Create and delete goals with ease
-
-### 📊 Reports & Analytics
-- **Period Selection** - View data for 7, 30, or 90 days
-- **Line Chart** - Visualize time trends over your selected period
-- **Project Breakdown** - Detailed stats for each project:
-  - Total time with percentage share
-  - Daily average calculations
-  - Entry counts and progress circles
-- **Summary Statistics** - Total time, daily average, and active projects
-
-### 📈 Review
-- **Historical Data** - Browse entries by date
-- **Project Filtering** - View time by project
-- **Entry Details** - See start/end times and descriptions
-- **Export Ready** - Data structured for future export features
-
----
-
-## 🚀 Installation
-
-### 🐳 Docker Installation (Recommended)
-
-The easiest way to run Timeo is using Docker. No Node.js installation required!
-
-#### Prerequisites
-
-- **Docker** 20.10 or higher
-- **Docker Compose** 2.0 or higher
-
-#### Quick Start with Docker
-
-1. **Clone the repository**
+### Using Docker (Recommended)
 
 ```bash
+# Clone the repository
 git clone https://github.com/yourusername/timeo.git
 cd timeo
-```
 
-2. **Start with Docker Compose**
-
-```bash
+# Run with Docker Compose
 docker-compose up -d
 ```
 
-3. **Access the application**
+Then navigate to [http://localhost:3000](http://localhost:3000).
 
-Navigate to [http://localhost:3000](http://localhost:3000)
-
-#### Using Makefile (Optional)
-
-For convenience, use the provided Makefile:
+### Manual Installation
 
 ```bash
-# Install and start
-make install
-
-# View logs
-make logs
-
-# Stop
-make down
-
-# Backup database
-make backup
-
-# View all commands
-make help
-```
-
-📖 **See [DOCKER.md](DOCKER.md) for detailed Docker documentation**
-
----
-
-### 💻 Manual Installation
-
-If you prefer to run without Docker:
-
-#### Prerequisites
-
-- **Node.js** 16.x or higher
-- **npm** or **yarn** package manager
-
-#### Quick Start
-
-1. **Clone the repository**
-
-```bash
+# Clone the repository
 git clone https://github.com/yourusername/timeo.git
 cd timeo
-```
 
-2. **Install dependencies**
-
-```bash
+# Install dependencies
 npm install
-```
 
-3. **Set up the database**
-
-```bash
-# Generate Prisma Client
+# Set up database
 npx prisma generate
-
-# Run database migrations
 npx prisma migrate dev --name init
-```
 
-4. **Start the development server**
-
-```bash
+# Run development server
 npm run dev
 ```
 
-5. **Open your browser**
-
-Navigate to [http://localhost:3000](http://localhost:3000)
-
----
-
 ## ⚙️ Configuration
-
-### Environment Variables
 
 Create a `.env` file in the project root:
 
 ```env
-# Database configuration
-DATABASE_URL="file:../data/dev.db"
-
-# Optional: Next.js configuration
+DATABASE_URL="file:./data/prod.db"
 NODE_ENV="development"
+
+# for docker
+DOMAIN=localhost
+EMAIL=example@gmail.com
+user=user
+pass=$$2y$$05$$Km9uBOW4zRDG6pmlbNcZJOlHrRjQQHHuv978QYpwKeoEqJolpNhtq
+# htpasswd -nbB user password
 ```
 
-### Database Location
+## 📖 Usage Guide
 
-- The SQLite database file is stored in `data/dev.db`
-- You can change the location by modifying `DATABASE_URL` in `.env`
-- The `data/` directory is gitignored to protect your personal data
+### 🏠 Dashboard
 
----
+The dashboard provides an overview of your productivity:
 
-## 📚 Usage
+- **Today's Stats**: View hours tracked today, active projects, and total entries
+- **Goals & Streaks**: Monitor your daily goals with visual streak indicators (🔥 for active streaks)
+- **Last 10 Days**: Browse your recent activity organized by date and project
+- **14-Day Visual Streak**: Interactive calendar showing your goal completion history
 
-### Starting a Timer
+### ⏱️ Timer
 
-1. Navigate to the **Timer** page
-2. Select a project from the dropdown
-3. Optionally add a description
-4. Click **Start** to begin tracking
-5. Click **Stop** when you're done
+Track your work time in real-time:
 
-### Creating a Project
+1. **Start Tracking**:
 
-1. Go to the **Projects** page
-2. Click **New Project**
-3. Enter a name and choose a color
-4. Click **Create Project**
+   - Navigate to the Timer page
+   - Select a project from the dropdown (or create a new one)
+   - Optionally add a description of what you're working on
+   - Click **Start** to begin tracking
 
-### Setting Up Goals
+2. **Stop Tracking**:
 
-1. Navigate to the **Goals** page
-2. Click **Create Goal**
-3. Select a project and set daily target minutes
-4. Click **Create Goal**
-5. Complete your daily target to build streaks! 🔥
+   - Click **Stop** when you're done
+   - The time entry is automatically saved with the correct start and end times
+   - The timer uses system time, so it works even if your browser tab is minimized or your computer sleeps
 
-### Viewing Reports
+3. **View Today's Entries**:
+   - Scroll down to see all entries for today
+   - Each entry shows the project, duration, and description
+   - Click the edit icon (✏️) to modify an entry
+   - Click the delete icon (🗑️) to remove an entry
 
-1. Go to the **Reports** page
-2. Select a time period (7, 30, or 90 days)
-3. View the line chart for overall trends
-4. Scroll down to see project-by-project breakdown
+### 📁 Projects
 
-### Editing Time Entries
+Organize your work with projects:
 
-1. On the **Timer** or **Projects** page
-2. Expand a project to see its entries
-3. Click the edit icon (✏️) on any entry
-4. Modify start time, end time, or description
-5. Save your changes
+1. **Create a Project**:
 
----
+   - Go to the Projects page
+   - Click **New Project**
+   - Enter a project name
+   - Choose a color from the palette or enter a custom hex color
+   - Click **Create Project**
 
-## 🔌 API Reference
+2. **Manage Projects**:
 
-### Timer Endpoints
+   - View all projects with their total time and entry count for today
+   - Click the edit icon to modify project name or color
+   - Click the delete icon to remove a project (this also deletes all associated entries and goals)
 
-#### Start Timer
-```http
-POST /api/timer/start
-Content-Type: application/json
+3. **View Project Entries**:
+   - Expand any project to see its time entries for today
+   - Each entry shows start time, end time, duration, and description
 
-{
-  "projectId": 1
-}
-```
+### 🎯 Goals
 
-#### Stop Timer
-```http
-POST /api/timer/stop
-Content-Type: application/json
+Set daily targets and build consistency:
 
-{
-  "entryId": 123
-}
-```
+1. **Create a Goal**:
 
-### Project Endpoints
+   - Navigate to the Goals page
+   - Click **Create Goal**
+   - Select a project
+   - Set the minimum minutes per day (e.g., 120 = 2 hours)
+   - Click **Create Goal**
 
-#### List Projects
-```http
-GET /api/projects
-```
+2. **Track Progress**:
 
-#### Create Project
-```http
-POST /api/projects
-Content-Type: application/json
+   - View your current streak (🔥 indicates an active streak)
+   - See today's progress toward your goal
+   - Check the 14-day visual calendar for your completion history
+   - Provisional streaks (🪵) show your streak even if today isn't complete yet
 
-{
-  "name": "My Project",
-  "color": "#6366f1"
-}
-```
+3. **Manage Goals**:
+   - Delete goals you no longer need
+   - Goals automatically update when you track time for their associated projects
 
-#### Update Project
-```http
-PATCH /api/projects/[id]
-Content-Type: application/json
+### 📊 Reports
 
-{
-  "name": "Updated Name",
-  "color": "#ec4899"
-}
-```
+Analyze your productivity with detailed reports:
 
-#### Delete Project
-```http
-DELETE /api/projects/[id]
-```
-> Deletes the project and all associated entries, goals, and goal statuses.
+1. **Select Time Period**:
 
-### Entry Endpoints
+   - Go to the Reports page
+   - Choose 7, 30, or 90 days
 
-#### List Entries
-```http
-GET /api/entries?startDate=2024-01-01&endDate=2024-01-02
-```
+2. **View Analytics**:
 
-#### Update Entry
-```http
-PATCH /api/entries/[id]
-Content-Type: application/json
+   - **Line Chart**: See your time trends over the selected period
+   - **Project Breakdown**: Detailed statistics for each project:
+     - Total time tracked
+     - Percentage of total time
+     - Daily average
+     - Number of entries
+     - Visual progress indicators
 
-{
-  "start": "2024-01-01T10:00:00Z",
-  "end": "2024-01-01T11:00:00Z",
-  "note": "Updated description"
-}
-```
+3. **Summary Statistics**:
+   - Total time tracked
+   - Daily average
+   - Number of active projects
 
-#### Delete Entry
-```http
-DELETE /api/entries/[id]
-```
+### ✏️ Editing Time Entries
 
-### Goal Endpoints
+You can edit any time entry to correct mistakes:
 
-#### List Goals
-```http
-GET /api/goals
-```
+1. **Find the Entry**:
 
-#### Create Goal
-```http
-POST /api/goals
-Content-Type: application/json
+   - Go to Timer or Projects page
+   - Expand the project containing the entry
+   - Locate the entry you want to edit
 
-{
-  "projectId": 1,
-  "minMinutesPerDay": 120
-}
-```
-
-#### Delete Goal
-```http
-DELETE /api/goals/[id]
-```
-
-### Review Endpoints
-
-#### Get Today's Data
-```http
-GET /api/review/today
-```
-
-Returns entries, project totals, and goal statuses for today.
-
----
+2. **Edit the Entry**:
+   - Click the edit icon (✏️) on the entry
+   - Modify the start time, end time, or description
+   - Click **Save** to update
+   - The duration is automatically recalculated based on the new times
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **React 18** - UI library
-- **Tailwind CSS** - Utility-first CSS framework
-- **Recharts** - Chart library for analytics
-- **Custom CSS Animations** - Smooth, modern animations
-
-### Backend
-- **Next.js API Routes** - Serverless API endpoints
-- **Prisma ORM** - Type-safe database access
-- **SQLite** - Lightweight, file-based database
-
-### Development Tools
-- **ESLint** - Code linting
-- **Prettier** - Code formatting
-- **PostCSS** - CSS processing
-
----
-
-## 📁 Project Structure
-
-```
-timeo/
-├── components/          # React components
-│   └── ProjectsList.js  # Reusable project list component
-├── data/               # Database files (gitignored)
-│   └── dev.db         # SQLite database
-├── lib/               # Utility functions
-│   ├── prisma.js     # Prisma client instance
-│   ├── dates.js      # Date utility functions
-│   └── goals.js      # Goal calculation utilities
-├── pages/            # Next.js pages
-│   ├── api/         # API routes
-│   │   ├── entries/ # Entry CRUD operations
-│   │   ├── goals/   # Goal management
-│   │   ├── projects/ # Project management
-│   │   ├── review/  # Review and today data
-│   │   └── timer/   # Timer operations
-│   ├── index.js     # Dashboard
-│   ├── timer.js     # Timer page
-│   ├── projects.js  # Projects page
-│   ├── goals.js     # Goals page
-│   └── report.js    # Reports & Analytics
-├── prisma/          # Database schema and migrations
-│   └── schema.prisma # Database models
-├── public/          # Static assets
-├── styles/          # Global styles
-│   └── globals.css  # Tailwind and custom CSS
-├── .env            # Environment variables
-├── package.json    # Dependencies and scripts
-└── README.md       # This file
-```
-
----
-
-## 🎨 Design System
-
-### Color Palette
-
-- **Primary:** `#6366f1` (Indigo)
-- **Secondary:** `#10b981` (Emerald)
-- **Warning:** `#f59e0b` (Amber)
-- **Background:** `#0f0f1e` (Dark Blue)
-- **Surface:** `#1a1a2e` (Dark Blue Gray)
-- **Elevated:** `#232338` (Lighter Dark)
-
-### Typography
-
-- **Font Family:** System UI, -apple-system, BlinkMacSystemFont
-- **Headings:** Bold, larger sizes
-- **Body:** Regular weight, comfortable line height
-- **Monospace:** For time displays and numbers
-
-### Components
-
-- **Cards:** Rounded corners with subtle borders and shadows
-- **Buttons:** Gradient backgrounds with hover effects
-- **Inputs:** Dark backgrounds with focus states
-- **Modals:** Backdrop blur with centered content
-
----
-
-## 🧪 Testing
-
-```bash
-# Run the development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-
-# Lint code
-npm run lint
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/AmazingFeature`)
-3. **Commit your changes** (`git commit -m 'Add some AmazingFeature'`)
-4. **Push to the branch** (`git push origin feature/AmazingFeature`)
-5. **Open a Pull Request**
-
-### Development Guidelines
-
-- Follow the existing code style
-- Write clear commit messages
-- Test your changes thoroughly
-- Update documentation as needed
-- Ensure all API routes work correctly
-
----
-
-## 📝 Roadmap
-
-### Planned Features
-
-- [ ] **Data Export** - Export entries to CSV/JSON
-- [ ] **Custom Reports** - Create custom date ranges and filters
-- [ ] **Tags System** - Add tags to time entries
-- [ ] **Multi-user Support** - Team features and permissions
-- [ ] **Calendar View** - Month/week calendar with entries
-- [ ] **Pomodoro Timer** - Integrated Pomodoro technique
-- [ ] **Mobile App** - Native iOS/Android apps
-- [ ] **Dark/Light Theme Toggle** - Theme customization
-- [ ] **Backup & Sync** - Cloud backup options
-- [ ] **Notifications** - Reminders and goal alerts
-
----
-
-## 🐛 Known Issues
-
-- Large datasets (>1000 entries) may slow down report generation
-- SVG charts may not render perfectly on some older browsers
-- Database file size grows over time (consider periodic cleanup)
-
----
+- **Frontend**: Next.js 13, React 18, Tailwind CSS
+- **Backend**: Next.js API Routes, Prisma ORM
+- **Database**: SQLite
+- **Charts**: Recharts
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
----
+## 🤝 Contributing
 
-## 👏 Acknowledgments
-
-- Inspired by [Toggl Track](https://toggl.com/track/)
-- Icons from [Heroicons](https://heroicons.com/)
-- Charts powered by [Recharts](https://recharts.org/)
-- UI components inspired by modern design systems
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-## 📞 Support
-
-If you have any questions or need help:
-
-- **Issues:** [GitHub Issues](https://github.com/yourusername/timeo/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/timeo/discussions)
-- **Email:** your.email@example.com
-
----
-
-## 💖 Show Your Support
-
-If you like this project, please consider:
-
-- ⭐ Starring the repository
-- 🐛 Reporting bugs
-- 💡 Suggesting new features
-- 🤝 Contributing code
-
----
-
-<div align="center">
-
-**Made with ❤️ and lots of ☕**
-
-[⬆ Back to Top](#️-timeo)
-
-</div>
+**Made with ❤️**

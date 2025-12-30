@@ -51,10 +51,16 @@ export default function Goals() {
   async function deleteGoal(id) {
     if (confirm("Delete this goal?")) {
       try {
-        await fetch(`/api/goals/${id}`, { method: "DELETE" });
-        setGoals(goals.filter((g) => g.id !== id));
+        const response = await fetch(`/api/goals/${id}`, { method: "DELETE" });
+        if (response.ok) {
+          setGoals(goals.filter((g) => g.id !== id));
+          fetchData(); // Refresh data to update UI
+        } else {
+          alert("Failed to delete goal");
+        }
       } catch (error) {
         console.error("Error deleting goal:", error);
+        alert("Error deleting goal. Please try again.");
       }
     }
   }
@@ -352,6 +358,7 @@ export default function Goals() {
               100,
             );
             const isCompleted = todayGoal.status === "completed";
+            const projectColor = g.project?.color || "#6366f1";
 
             return (
               <div
@@ -444,23 +451,20 @@ export default function Goals() {
                       </div>
                       <div className="w-full h-3 bg-dark-elevated rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            isCompleted
-                              ? "bg-gradient-to-r from-accent-secondary to-emerald-400"
-                              : progress > 50
-                                ? "bg-gradient-to-r from-accent-warning to-amber-400"
-                                : "bg-gradient-to-r from-accent-primary to-accent-primary-hover"
-                          }`}
-                          style={{ width: `${progress}%` }}
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${progress}%`,
+                            backgroundColor: projectColor,
+                            opacity: isCompleted ? 1 : 0.7,
+                          }}
                         />
                       </div>
                       <div className="text-center mt-2">
                         <span
-                          className={`text-sm font-medium ${
-                            isCompleted
-                              ? "text-accent-secondary"
-                              : "text-text-tertiary"
-                          }`}
+                          className="text-sm font-medium"
+                          style={{
+                            color: isCompleted ? projectColor : undefined,
+                          }}
                         >
                           {Math.round(progress)}% Complete
                         </span>
@@ -501,9 +505,12 @@ export default function Goals() {
                                 <div
                                   className={`w-full aspect-square rounded-lg transition-all duration-300 ${
                                     isCompleted
-                                      ? "bg-gradient-to-br from-accent-warning to-amber-400 shadow-glow-sm"
+                                      ? "shadow-glow-sm"
                                       : "bg-dark-elevated border border-dark-border"
                                   } hover:scale-110 cursor-pointer`}
+                                  style={{
+                                    backgroundColor: isCompleted ? projectColor : undefined,
+                                  }}
                                   title={`${date.toDateString()}: ${s.status}`}
                                 >
                                   {isCompleted && (

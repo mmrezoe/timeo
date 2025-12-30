@@ -71,12 +71,20 @@ const ProjectsList = ({
   const formatDateTimeLocal = (dateString) => {
     if (!dateString) return "";
     const date = new Date(dateString);
+    // Get local date/time components
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const parseDateTimeLocal = (dateTimeLocalString) => {
+    if (!dateTimeLocalString) return null;
+    // Parse as local time and return ISO string
+    const date = new Date(dateTimeLocalString);
+    return date.toISOString();
   };
 
   const handleEditClick = (entry) => {
@@ -93,14 +101,18 @@ const ProjectsList = ({
     if (!editingEntry) return;
 
     try {
+      // Convert local datetime strings to ISO strings to preserve timezone
+      const startISO = editFormData.startTime ? parseDateTimeLocal(editFormData.startTime) : null;
+      const endISO = editFormData.endTime ? parseDateTimeLocal(editFormData.endTime) : null;
+
       const response = await fetch(`/api/entries/${editingEntry.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          start: editFormData.startTime,
-          end: editFormData.endTime,
+          start: startISO,
+          end: endISO,
           note: editFormData.description,
         }),
       });
@@ -310,13 +322,17 @@ const ProjectsList = ({
       )}
 
       <div className="space-y-3">
-        {projects.map((project, index) => {
-          const isExpanded = expandedProjects[project.id];
-          const hasEntries = project.entries && project.entries.length > 0;
-          const projectColor = getProjectColor(project);
-          const projectColorLight = lightenColor(projectColor);
+        {/* Check if any project has totalTime > 0 */}
+        {(() => {
+          const hasAnyTimeToday = projects.some(p => (p.totalTime || 0) > 0);
+          
+          return projects.map((project, index) => {
+            const isExpanded = expandedProjects[project.id];
+            const hasEntries = project.entries && project.entries.length > 0;
+            const projectColor = getProjectColor(project);
+            const projectColorLight = lightenColor(projectColor);
 
-          return (
+            return (
             <div
               key={project.id}
               className="animate-smooth-slide-up"
@@ -324,18 +340,20 @@ const ProjectsList = ({
             >
               {/* Project Summary Row */}
               <div
-                className={`
+                  className={`
                   group relative bg-dark-surface rounded-xl border border-dark-border
                   transition-all duration-300 ease-smooth
-                  ${hasEntries ? "hover:border-dark-border-light hover:shadow-premium" : ""}
+                  ${hasEntries && hasAnyTimeToday ? "hover:border-dark-border-light hover:shadow-premium" : ""}
                   ${isExpanded ? "border-dark-border-light shadow-premium" : ""}
                   ${deletingProjectId === project.id ? "opacity-50" : ""}
                 `}
               >
                 <div className="flex items-center justify-between p-5">
                   <div
-                    className="flex items-center space-x-4 flex-1 min-w-0 cursor-pointer"
-                    onClick={() => hasEntries && toggleProject(project.id)}
+                    className={`flex items-center space-x-4 flex-1 min-w-0 ${
+                      hasEntries && hasAnyTimeToday ? "cursor-pointer" : ""
+                    }`}
+                    onClick={() => hasEntries && hasAnyTimeToday && toggleProject(project.id)}
                   >
                     {/* Project Color Indicator */}
                     <div
@@ -355,7 +373,7 @@ const ProjectsList = ({
                         w-12 h-12 rounded-xl
                         flex items-center justify-center flex-shrink-0
                         transform transition-all duration-300 ease-smooth
-                        ${hasEntries ? "group-hover:scale-110 group-hover:shadow-glow-md" : ""}
+                        ${hasEntries && hasAnyTimeToday ? "group-hover:scale-110 group-hover:shadow-glow-md" : ""}
                       `}
                       style={{
                         background: `linear-gradient(to bottom right, ${projectColor}, ${projectColorLight})`,
@@ -381,7 +399,7 @@ const ProjectsList = ({
                       <h3 className="text-lg font-semibold text-text-primary mb-1 truncate">
                         {project.name}
                       </h3>
-                      {hasEntries && (
+                      {hasEntries && hasAnyTimeToday && (
                         <p className="text-sm text-text-secondary">
                           {project.entries.length}{" "}
                           {project.entries.length === 1 ? "entry" : "entries"}
@@ -446,17 +464,19 @@ const ProjectsList = ({
                       </div>
                     )}
 
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-text-primary font-mono">
-                        {formatTime(project.totalTime || 0)}
+                    {hasAnyTimeToday && (
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-text-primary font-mono">
+                          {formatTime(project.totalTime || 0)}
+                        </div>
+                        <div className="text-xs text-text-tertiary mt-1">
+                          Total today
+                        </div>
                       </div>
-                      <div className="text-xs text-text-tertiary mt-1">
-                        Total today
-                      </div>
-                    </div>
+                    )}
 
                     {/* Expand/Collapse Icon */}
-                    {hasEntries && (
+                    {hasEntries && hasAnyTimeToday && (
                       <div
                         className={`
                           w-8 h-8 rounded-lg bg-dark-elevated flex items-center justify-center
@@ -483,7 +503,7 @@ const ProjectsList = ({
                 </div>
 
                 {/* Expanded Entries */}
-                {hasEntries && (
+                {hasEntries && hasAnyTimeToday && (
                   <div
                     className={`
                       overflow-hidden transition-all duration-300 ease-smooth
@@ -620,7 +640,8 @@ const ProjectsList = ({
               </div>
             </div>
           );
-        })}
+          });
+        })()}
       </div>
     </>
   );

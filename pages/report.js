@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   LineChart,
   Line,
@@ -15,13 +15,69 @@ import {
 export default function Report() {
   const [loading, setLoading] = useState(true);
   const [weekData, setWeekData] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [totalTime, setTotalTime] = useState(0);
+  const [allProjects, setAllProjects] = useState([]);
+  const [allProjectsData, setAllProjectsData] = useState([]);
   const [selectedPeriod, setSelectedPeriod] = useState(7);
+  const [selectedProjectIds, setSelectedProjectIds] = useState([]);
+  const [showProjectFilter, setShowProjectFilter] = useState(false);
 
   useEffect(() => {
     fetchReportData();
   }, [selectedPeriod]);
+
+  // Filter data based on selected projects
+  const { filteredProjects, filteredWeekData, filteredTotalTime } = useMemo(() => {
+    // If no projects selected or all selected, show all
+    const shouldShowAll = selectedProjectIds.length === 0 || 
+                         selectedProjectIds.length === allProjectsData.length ||
+                         allProjectsData.length === 0;
+    
+    if (shouldShowAll) {
+      const totalTime = weekData.reduce((sum, day) => sum + day.totalMinutes, 0);
+      return {
+        filteredProjects: allProjectsData,
+        filteredWeekData: weekData,
+        filteredTotalTime: totalTime,
+      };
+    }
+
+    // Filter projects
+    const filteredProjects = allProjectsData.filter(p => 
+      selectedProjectIds.includes(p.id)
+    );
+
+    // Filter weekData
+    const filteredWeekData = weekData.map(day => {
+      const filteredDayProjects = {};
+      let dayTotal = 0;
+
+      selectedProjectIds.forEach(projectId => {
+        if (day.projects[projectId]) {
+          filteredDayProjects[projectId] = day.projects[projectId];
+          dayTotal += day.projects[projectId];
+        }
+      });
+
+      return {
+        ...day,
+        projects: filteredDayProjects,
+        totalHours: Number((dayTotal / 60).toFixed(2)),
+        totalMinutes: dayTotal,
+      };
+    });
+
+    // Calculate total time
+    const filteredTotalTime = filteredWeekData.reduce(
+      (sum, day) => sum + day.totalMinutes,
+      0
+    );
+
+    return {
+      filteredProjects,
+      filteredWeekData,
+      filteredTotalTime,
+    };
+  }, [selectedProjectIds, allProjectsData, weekData]);
 
   const fetchReportData = async () => {
     try {
@@ -50,7 +106,13 @@ export default function Report() {
         const dayProjects = {};
 
         entries.forEach((entry) => {
-          const duration = entry.duration || 0;
+          // Calculate duration from start and end times if duration is not available
+          let duration = entry.duration || 0;
+          if (!duration && entry.start && entry.end) {
+            const startTime = new Date(entry.start);
+            const endTime = new Date(entry.end);
+            duration = Math.floor((endTime.getTime() - startTime.getTime()) / 60000); // duration in minutes
+          }
           dayTotal += duration;
           totalMinutes += duration;
 
@@ -86,12 +148,15 @@ export default function Report() {
       }
 
       setWeekData(historyData);
-      setProjects(
-        Object.values(projectsMap).sort(
-          (a, b) => b.totalMinutes - a.totalMinutes,
-        ),
+      const allProjectsList = Object.values(projectsMap).sort(
+        (a, b) => b.totalMinutes - a.totalMinutes,
       );
-      setTotalTime(totalMinutes);
+      setAllProjectsData(allProjectsList);
+      
+      // Initialize selected projects with all projects if empty
+      if (selectedProjectIds.length === 0 && allProjectsList.length > 0) {
+        setSelectedProjectIds(allProjectsList.map(p => p.id));
+      }
     } catch (error) {
       console.error("Error fetching report data:", error);
     } finally {
@@ -143,21 +208,154 @@ export default function Report() {
           </p>
         </div>
 
-        {/* Period Selector */}
-        <div className="flex items-center space-x-2">
-          {periodOptions.map((option) => (
+        <div className="flex items-center space-x-3">
+          {/* Project Filter */}
+          <div className="relative">
             <button
-              key={option.value}
-              onClick={() => setSelectedPeriod(option.value)}
-              className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                selectedPeriod === option.value
-                  ? "bg-accent-primary text-white shadow-glow-sm"
+              onClick={() => setShowProjectFilter(!showProjectFilter)}
+              className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 ${
+                selectedProjectIds.length > 0 && selectedProjectIds.length < allProjectsData.length
+                  ? "bg-accent-secondary text-white shadow-glow-sm"
                   : "bg-dark-surface text-text-secondary hover:bg-dark-surface-hover border border-dark-border"
               }`}
             >
-              {option.label}
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              <span>
+                {selectedProjectIds.length === 0 || selectedProjectIds.length === allProjectsData.length
+                  ? "All Projects"
+                  : `${selectedProjectIds.length} Project${selectedProjectIds.length !== 1 ? "s" : ""}`}
+              </span>
             </button>
-          ))}
+
+            {/* Filter Dropdown */}
+            {showProjectFilter && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowProjectFilter(false)}
+                />
+                <div className="absolute right-0 mt-2 w-64 bg-dark-surface border border-dark-border rounded-xl shadow-premium z-50 max-h-96 overflow-y-auto">
+                  <div className="p-4 border-b border-dark-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-text-primary">
+                        Filter Projects
+                      </h3>
+                      <button
+                        onClick={() => setShowProjectFilter(false)}
+                        className="icon-btn text-text-secondary hover:text-text-primary"
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setSelectedProjectIds(allProjectsData.map(p => p.id));
+                        }}
+                        className="text-xs text-accent-primary hover:text-accent-primary-hover"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-text-tertiary">|</span>
+                      <button
+                        onClick={() => {
+                          setSelectedProjectIds([]);
+                        }}
+                        className="text-xs text-accent-primary hover:text-accent-primary-hover"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {allProjectsData.map((project) => {
+                      const isSelected = selectedProjectIds.includes(project.id);
+                      return (
+                        <label
+                          key={project.id}
+                          className="flex items-center space-x-3 p-2 rounded-lg hover:bg-dark-elevated cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProjectIds([
+                                  ...selectedProjectIds,
+                                  project.id,
+                                ]);
+                              } else {
+                                setSelectedProjectIds(
+                                  selectedProjectIds.filter(
+                                    (id) => id !== project.id
+                                  )
+                                );
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-dark-border text-accent-primary focus:ring-accent-primary focus:ring-2"
+                            style={{
+                              accentColor: project.color,
+                            }}
+                          />
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: project.color }}
+                          />
+                          <span className="text-text-primary text-sm flex-1">
+                            {project.name}
+                          </span>
+                          <span className="text-text-tertiary text-xs">
+                            {formatTime(project.totalMinutes)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Period Selector */}
+          <div className="flex items-center space-x-2">
+            {periodOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSelectedPeriod(option.value)}
+                className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+                  selectedPeriod === option.value
+                    ? "bg-accent-primary text-white shadow-glow-sm"
+                    : "bg-dark-surface text-text-secondary hover:bg-dark-surface-hover border border-dark-border"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -200,7 +398,7 @@ export default function Report() {
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-text-primary font-mono">
-                    {formatTime(totalTime)}
+                    {formatTime(filteredTotalTime)}
                   </div>
                   <div className="text-text-secondary text-sm">Total Time</div>
                 </div>
@@ -226,7 +424,7 @@ export default function Report() {
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-text-primary font-mono">
-                    {(totalTime / weekData.length || 0).toFixed(0)}m
+                    {(filteredTotalTime / filteredWeekData.length || 0).toFixed(0)}m
                   </div>
                   <div className="text-text-secondary text-sm">
                     Daily Average
@@ -254,7 +452,7 @@ export default function Report() {
                 </div>
                 <div>
                   <div className="text-3xl font-bold text-text-primary">
-                    {projects.length}
+                    {filteredProjects.length}
                   </div>
                   <div className="text-text-secondary text-sm">
                     Active Projects
@@ -273,9 +471,9 @@ export default function Report() {
               </h2>
             </div>
 
-            {weekData.length > 0 ? (
+            {filteredWeekData.length > 0 ? (
               <ResponsiveContainer width="100%" height={350}>
-                <LineChart data={weekData}>
+                <LineChart data={filteredWeekData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3c" />
                   <XAxis
                     dataKey="displayDate"
@@ -336,12 +534,12 @@ export default function Report() {
               </h2>
             </div>
 
-            {projects.length > 0 ? (
+            {filteredProjects.length > 0 ? (
               <div className="space-y-4">
-                {projects.map((project, index) => {
+                {filteredProjects.map((project, index) => {
                   const percentage =
-                    totalTime > 0
-                      ? ((project.totalMinutes / totalTime) * 100).toFixed(1)
+                    filteredTotalTime > 0
+                      ? ((project.totalMinutes / filteredTotalTime) * 100).toFixed(1)
                       : 0;
 
                   return (
@@ -443,7 +641,7 @@ export default function Report() {
                               <div className="text-2xl font-bold font-mono text-text-primary">
                                 {formatTime(
                                   Math.round(
-                                    project.totalMinutes / weekData.length,
+                                    project.totalMinutes / filteredWeekData.length,
                                   ),
                                 )}
                               </div>
@@ -519,7 +717,7 @@ export default function Report() {
                             <div className="text-lg font-bold font-mono text-text-primary">
                               {formatTime(
                                 Math.round(
-                                  project.totalMinutes / weekData.length,
+                                  project.totalMinutes / filteredWeekData.length,
                                 ),
                               )}
                             </div>

@@ -41,7 +41,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:/app/data/prod.db
+      - DATABASE_URL=${DATABASE_URL:-file:/app/data/prod.db}
     volumes:
       - ./data:/app/data
     restart: unless-stopped
