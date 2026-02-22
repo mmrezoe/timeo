@@ -1,4 +1,5 @@
 import prisma from '../../lib/prisma';
+import { parseUTC } from '../../lib/dates';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -9,12 +10,14 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'startDate and endDate are required' });
       }
 
+      const startUTC = parseUTC(startDate);
+      const endUTC = parseUTC(endDate);
+
+      // Use overlap (same as review/today): entries that overlap the day range
       const entries = await prisma.timeEntry.findMany({
         where: {
-          start: {
-            gte: new Date(startDate),
-            lt: new Date(endDate),
-          },
+          start: { lt: endUTC },
+          OR: [{ end: { gt: startUTC } }, { end: null }],
         },
         include: {
           project: true,

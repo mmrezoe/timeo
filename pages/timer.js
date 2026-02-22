@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import ProjectsList from "../components/ProjectsList";
+import {
+  getLogicalDayFromUTC,
+  subtractLogicalDays,
+  getStartOfLogicalDayUTC,
+  getEndOfLogicalDayUTC,
+} from "../lib/dates";
 
 export default function Timer() {
   const [isRunning, setIsRunning] = useState(false);
@@ -9,6 +15,9 @@ export default function Timer() {
   const [startTime, setStartTime] = useState(null);
   const [runningEntryId, setRunningEntryId] = useState(null);
   const [todayProjects, setTodayProjects] = useState([]);
+  const [weekHistory, setWeekHistory] = useState([]);
+  const [appTimezone, setAppTimezone] = useState("UTC");
+  const [todayLogicalDay, setTodayLogicalDay] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [projectName, setProjectName] = useState("");
@@ -83,11 +92,9 @@ export default function Timer() {
   const fetchTodayProjects = async () => {
     try {
       const response = await fetch("/api/review/today");
-      const data = await response.json();
+      const data = response.ok ? await response.json() : {};
 
-      // Group entries by project
       const projectsMap = {};
-
       if (data.entries) {
         data.entries.forEach((entry) => {
           if (!projectsMap[entry.projectId]) {
@@ -111,9 +118,102 @@ export default function Timer() {
       }
 
       setTodayProjects(Object.values(projectsMap));
+      setAppTimezone(data.timezone || "UTC");
+      if (data.logicalDay) {
+        setTodayLogicalDay(data.logicalDay);
+        fetch10DaysHistory(data.timezone || "UTC", data.logicalDay);
+      }
     } catch (error) {
       console.error("Error fetching today projects:", error);
     }
+  };
+
+  const fetch10DaysHistory = async (timezone, currentLogicalDay) => {
+    try {
+      const historyData = [];
+      const tz = timezone || appTimezone || "UTC";
+      const todayLogical = currentLogicalDay || todayLogicalDay;
+      if (!todayLogical) return;
+
+      for (let i = 1; i <= 10; i++) {
+        const logicalDay = subtractLogicalDays(todayLogical, i, tz);
+        const start = getStartOfLogicalDayUTC(logicalDay, tz);
+        const end = getEndOfLogicalDayUTC(logicalDay, tz);
+        const date = start;
+
+        const response = await fetch(
+          `/api/entries?startDate=${start.toISOString()}&endDate=${end.toISOString()}`
+        );
+        if (!response.ok) continue;
+
+        const entries = await response.json();
+        const projectsMap = {};
+        let dayTotalTime = 0;
+        const dayStartMs = start.getTime();
+        const dayEndMs = end.getTime();
+        const nowMs = Date.now();
+
+        entries.forEach((entry) => {
+          const entryStart = new Date(entry.start).getTime();
+          const entryEnd = entry.end ? new Date(entry.end).getTime() : nowMs;
+          const overlapStart = Math.max(entryStart, dayStartMs);
+          const overlapEnd = Math.min(entryEnd, dayEndMs);
+          const overlapMinutes = overlapEnd > overlapStart ? Math.floor((overlapEnd - overlapStart) / 60000) : 0;
+          if (overlapMinutes <= 0) return;
+
+          if (!projectsMap[entry.projectId]) {
+            projectsMap[entry.projectId] = {
+              id: entry.projectId,
+              name: entry.project?.name || "Unknown Project",
+              color: entry.project?.color || "#6366f1",
+              totalTime: 0,
+              entries: [],
+            };
+          }
+
+          const durationSeconds = overlapMinutes * 60;
+          projectsMap[entry.projectId].totalTime += durationSeconds;
+          dayTotalTime += durationSeconds;
+          projectsMap[entry.projectId].entries.push({
+            id: entry.id,
+            startTime: entry.start,
+            endTime: entry.end,
+            description: entry.note || "",
+          });
+        });
+
+        const finalTotalTime = dayTotalTime;
+        if (finalTotalTime > 0) {
+          historyData.push({
+            date: date,
+            dateLabel: getDateLabel(date),
+            projects: Object.values(projectsMap),
+            totalTime: finalTotalTime,
+          });
+        }
+      }
+
+      setWeekHistory(historyData);
+    } catch (error) {
+      console.error("Error fetching 10 days history:", error);
+    }
+  };
+
+  const getDateLabel = (date) => {
+    const tz = appTimezone || "UTC";
+    const logicalDay = getLogicalDayFromUTC(new Date(date), tz);
+    const yesterdayLogical = todayLogicalDay ? subtractLogicalDays(todayLogicalDay, 1, tz) : null;
+    if (yesterdayLogical && logicalDay === yesterdayLogical) return "Yesterday";
+    const [y, m, d] = logicalDay.split("-").map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  };
+
+  const formatTimeHistory = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
   };
 
   const formatTime = (seconds) => {
@@ -121,6 +221,15 @@ export default function Timer() {
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const formatTimeSimple = (seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
   };
 
   const getElapsedTime = () => {
@@ -198,7 +307,6 @@ export default function Timer() {
       setRunningEntryId(null);
       setCurrentTime(new Date());
 
-      // Refresh today's projects
       fetchTodayProjects();
     } catch (error) {
       console.error("Error stopping timer:", error);
@@ -728,7 +836,32 @@ export default function Timer() {
       {/* Today's Projects */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-text-primary">Today</h2>
+          <div className="flex items-center space-x-4">
+            <h2 className="text-2xl font-semibold text-text-primary">Today</h2>
+            {todayProjects.length > 0 && (() => {
+              const totalTime = todayProjects.reduce((sum, p) => sum + (p.totalTime || 0), 0);
+              return totalTime > 0 ? (
+                <div className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-br from-accent-primary/20 to-accent-primary-hover/20 border border-accent-primary/30">
+                  <svg
+                    className="w-4 h-4 text-accent-primary"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span className="text-accent-primary font-semibold font-mono text-sm">
+                    {formatTimeSimple(totalTime)}
+                  </span>
+                </div>
+              ) : null;
+            })()}
+          </div>
           <div className="flex items-center space-x-2 text-text-secondary text-sm">
             <svg
               className="w-4 h-4"
@@ -785,6 +918,44 @@ export default function Timer() {
             projects={todayProjects}
             onUpdate={fetchTodayProjects}
           />
+        )}
+      </div>
+
+      {/* Last 10 Days (yesterday and earlier) */}
+      <div className="space-y-4 mt-12">
+        <h2 className="text-2xl font-semibold text-text-primary">Last 10 Days</h2>
+        {weekHistory.length === 0 ? (
+          <div className="card-premium">
+            <div className="flex flex-col items-center justify-center py-12">
+              <svg className="w-10 h-10 text-text-tertiary mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-text-secondary text-center">No activity in the past 10 days</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {weekHistory.map((day, dayIndex) => (
+              <div key={day.date.toISOString()} className="space-y-4 animate-smooth-slide-up">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-xl font-semibold text-text-primary">{day.dateLabel}</h3>
+                  {day.dateLabel !== "Yesterday" && (
+                    <span className="text-text-tertiary text-sm">
+                      {new Date(day.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  )}
+                  <div className="flex-1 h-px bg-dark-border" />
+                  <div className="flex items-center space-x-2 px-4 py-2 rounded-lg bg-gradient-to-br from-accent-primary/20 to-accent-primary-hover/20 border border-accent-primary/30">
+                    <svg className="w-4 h-4 text-accent-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-accent-primary font-semibold font-mono text-sm">{formatTimeHistory(day.totalTime)}</span>
+                  </div>
+                </div>
+                <ProjectsList projects={day.projects} />
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

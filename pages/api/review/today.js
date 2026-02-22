@@ -1,14 +1,16 @@
 const prisma = require("../../../lib/prisma");
-const { dayRangeFromDate } = require("../../../lib/dates");
-const { computeGoalDayMinutes, computeStreak } = require("../../../lib/goals");
+const {
+  dayRangeFromDate,
+  getNowUTC,
+  toUTC,
+  getCurrentLogicalDay,
+  getAppTimeZone,
+} = require("../../../lib/dates");
+const { computeGoalDayMinutes, computeStreak, updateTodayStatuses } = require("../../../lib/goals");
 
 function minutesOverlap(entryStart, entryEnd, dayStart, dayEnd) {
-  const s = entryStart instanceof Date ? entryStart : new Date(entryStart);
-  const e = entryEnd
-    ? entryEnd instanceof Date
-      ? entryEnd
-      : new Date(entryEnd)
-    : new Date();
+  const s = toUTC(entryStart);
+  const e = entryEnd ? toUTC(entryEnd) : getNowUTC();
   const overlapStart = s > dayStart ? s : dayStart;
   const overlapEnd = e < dayEnd ? e : dayEnd;
   if (overlapEnd > overlapStart)
@@ -22,7 +24,13 @@ export default async function handler(req, res) {
     return res.status(405).end();
   }
 
-  const { start, end } = dayRangeFromDate(new Date());
+  // Update today's statuses to ensure they're current
+  await updateTodayStatuses();
+
+  // Logical day and range in app timezone (server uses getAppTimeZone())
+  const timezone = getAppTimeZone();
+  const logicalDay = getCurrentLogicalDay();
+  const { start, end } = dayRangeFromDate(getNowUTC());
 
   // fetch entries that overlap today
   const entries = await prisma.timeEntry.findMany({
@@ -57,6 +65,7 @@ export default async function handler(req, res) {
   const projectTotals = Array.from(projectTotalsMap.entries()).map(
     ([projectId, minutes]) => ({ projectId, minutes }),
   );
+  const totalMinutes = entriesOut.reduce((sum, e) => sum + e.minutes, 0);
 
   // goals statuses for today
   const goals = await prisma.goal.findMany({ include: { project: true } });
@@ -78,7 +87,7 @@ export default async function handler(req, res) {
       name: g.project.name,
       minMinutesPerDay: g.minMinutesPerDay,
       minutes,
-      status,
+      status: status.toLowerCase(), // Convert to lowercase for frontend compatibility
       emoji,
       streak,
     });
@@ -86,6 +95,9 @@ export default async function handler(req, res) {
 
   return res.json({
     date: start,
+    logicalDay,
+    timezone,
+    totalMinutes,
     entries: entriesOut,
     projectTotals,
     goals: goalsOut,

@@ -1,12 +1,14 @@
 const prisma = require('../../../lib/prisma');
+const { parseUTC } = require('../../../lib/dates');
 
 export default async function handler(req, res) {
   const { id } = req.query;
   if (req.method === 'PATCH') {
     const { start, end, projectId, note } = req.body;
     const data = {};
-    if (start) data.start = new Date(start);
-    if (end !== undefined) data.end = end ? new Date(end) : null;
+    // Parse dates to UTC
+    if (start) data.start = parseUTC(start);
+    if (end !== undefined) data.end = end ? parseUTC(end) : null;
     if (projectId) data.projectId = Number(projectId);
     if (note !== undefined) data.note = note;
     const updated = await prisma.timeEntry.update({

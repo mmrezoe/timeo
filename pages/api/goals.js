@@ -1,19 +1,67 @@
 const prisma = require('../../lib/prisma');
-const { initializeGoalStatuses, cleanupDuplicateDayStatuses, updateTodayStatuses } = require('../../lib/goals');
+const { initializeGoalStatuses, updateRecentDayStatuses } = require('../../lib/goals');
+const { normalizeToUTCMidnight, getLogicalDayFromUTC, getAppTimeZone } = require('../../lib/dates');
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    // Clean up duplicates for all goals (only once, can be removed after first run)
-    const allGoals = await prisma.goal.findMany({ select: { id: true } });
-    for (const goal of allGoals) {
-      await cleanupDuplicateDayStatuses(goal.id);
+    try {
+      await updateRecentDayStatuses(14);
+    } catch (e) {
+      console.error("updateRecentDayStatuses failed:", e);
     }
+    const goals = await prisma.goal.findMany({ 
+      include: { 
+        project: true, 
+        dayStatuses: { 
+          take: 90, 
+          orderBy: { date: 'desc' } 
+        } 
+      } 
+    });
     
-    // Update today's statuses to ensure they're current (handles day changes)
-    await updateTodayStatuses();
+    // Convert status to lowercase for frontend compatibility
+    // Also remove duplicates by date (keep the most recent one)
+    // Use normalizeToUTCMidnight to handle dates that weren't normalized before
+    const tz = getAppTimeZone();
+    const goalsWithLowercaseStatus = goals.map(goal => {
+      const uniqueDaysMap = new Map();
+      for (const status of goal.dayStatuses) {
+        const normalizedDate = normalizeToUTCMidnight(status.date, tz);
+        const dateKey = getLogicalDayFromUTC(status.date, tz);
+        
+        // Keep the most recent entry for each day, or the one with higher minutes if dates are equal
+        if (!uniqueDaysMap.has(dateKey)) {
+          uniqueDaysMap.set(dateKey, {
+            ...status,
+            date: normalizedDate, // Use normalized date
+            status: status.status.toLowerCase()
+          });
+        } else {
+          const existing = uniqueDaysMap.get(dateKey);
+          // Prefer entry with higher minutes, or more recent if minutes are equal
+          if (status.minutes > existing.minutes || 
+              (status.minutes === existing.minutes && new Date(status.date) > new Date(existing.date))) {
+            uniqueDaysMap.set(dateKey, {
+              ...status,
+              date: normalizedDate, // Use normalized date
+              status: status.status.toLowerCase()
+            });
+          }
+        }
+      }
+      
+      // Convert map to array and sort by date descending
+      const uniqueDayStatuses = Array.from(uniqueDaysMap.values()).sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      );
+
+      return {
+        ...goal,
+        dayStatuses: uniqueDayStatuses
+      };
+    });
     
-    const goals = await prisma.goal.findMany({ include: { project: true, dayStatuses: { take: 30, orderBy: { date: 'desc' } } } });
-    return res.json(goals);
+    return res.json(goalsWithLowercaseStatus);
   }
   if (req.method === 'POST') {
     const { projectId, minMinutesPerDay } = req.body;
