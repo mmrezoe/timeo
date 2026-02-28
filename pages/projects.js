@@ -38,23 +38,13 @@ export default function Projects() {
       const response = await fetch("/api/projects");
       const projectsData = await response.json();
 
-      // Store all projects
       setAllProjects(projectsData);
 
-      // Fetch today's entries
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      // Use review/today so "today" is the same logical day as Timer/Goals (no day shift)
+      const todayResponse = await fetch("/api/review/today");
+      const todayData = todayResponse.ok ? await todayResponse.json() : { entries: [] };
 
-      const entriesResponse = await fetch(
-        `/api/entries?startDate=${today.toISOString()}&endDate=${tomorrow.toISOString()}`,
-      );
-      const entries = await entriesResponse.json();
-
-      // Group entries by project
       const projectsMap = {};
-
       projectsData.forEach((project) => {
         projectsMap[project.id] = {
           ...project,
@@ -63,10 +53,10 @@ export default function Projects() {
         };
       });
 
-      entries.forEach((entry) => {
+      (todayData.entries || []).forEach((entry) => {
         if (projectsMap[entry.projectId]) {
-          const duration = entry.duration || 0;
-          projectsMap[entry.projectId].totalTime += duration * 60; // convert to seconds
+          const durationSeconds = (entry.minutes || 0) * 60;
+          projectsMap[entry.projectId].totalTime += durationSeconds;
           projectsMap[entry.projectId].entries.push({
             id: entry.id,
             startTime: entry.start,
@@ -76,10 +66,7 @@ export default function Projects() {
         }
       });
 
-      // Include all projects (show projects with no entries today as well)
-      const enrichedData = Object.values(projectsMap);
-
-      setProjects(enrichedData);
+      setProjects(Object.values(projectsMap));
     } catch (error) {
       console.error("Error fetching projects:", error);
       setProjects([]);

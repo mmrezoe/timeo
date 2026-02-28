@@ -10,7 +10,9 @@ const ProjectsList = ({
   const [expandedProjects, setExpandedProjects] = useState({});
   const [editingEntry, setEditingEntry] = useState(null);
   const [editFormData, setEditFormData] = useState({
+    startDate: "",
     startTime: "",
+    endDate: "",
     endTime: "",
     description: "",
   });
@@ -36,9 +38,10 @@ const ProjectsList = ({
 
   const formatTimeDetailed = (start, end) => {
     if (!start || !end) return "—";
+    // 24-hour format: use en-GB so locale never forces 12h
     const opts = { hour: "2-digit", minute: "2-digit", hour12: false };
-    const startStr = new Date(start).toLocaleTimeString([], opts);
-    const endStr = new Date(end).toLocaleTimeString([], opts);
+    const startStr = new Date(start).toLocaleTimeString("en-GB", opts);
+    const endStr = new Date(end).toLocaleTimeString("en-GB", opts);
     return `${startStr} - ${endStr}`;
   };
 
@@ -64,29 +67,31 @@ const ProjectsList = ({
   };
 
   const formatDateTimeLocal = (dateString) => {
-    if (!dateString) return "";
+    if (!dateString) return { date: "", time: "" };
     const date = new Date(dateString);
-    // Get local date/time components
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
+    return { date: `${year}-${month}-${day}`, time: `${hours}:${minutes}` };
   };
 
-  const parseDateTimeLocal = (dateTimeLocalString) => {
-    if (!dateTimeLocalString) return null;
-    // Parse as local time and return ISO string
-    const date = new Date(dateTimeLocalString);
-    return date.toISOString();
+  const parseDateAndTimeToISO = (dateStr, timeStr) => {
+    if (!dateStr || !timeStr) return null;
+    const date = new Date(dateStr + "T" + timeStr);
+    return isNaN(date.getTime()) ? null : date.toISOString();
   };
 
   const handleEditClick = (entry) => {
     setEditingEntry(entry);
+    const start = formatDateTimeLocal(entry.startTime);
+    const end = formatDateTimeLocal(entry.endTime);
     setEditFormData({
-      startTime: formatDateTimeLocal(entry.startTime),
-      endTime: formatDateTimeLocal(entry.endTime),
+      startDate: start.date,
+      startTime: start.time,
+      endDate: end.date,
+      endTime: end.time,
       description: entry.description || "",
     });
     setShowEditModal(true);
@@ -96,9 +101,8 @@ const ProjectsList = ({
     if (!editingEntry) return;
 
     try {
-      // Convert local datetime strings to ISO strings to preserve timezone
-      const startISO = editFormData.startTime ? parseDateTimeLocal(editFormData.startTime) : null;
-      const endISO = editFormData.endTime ? parseDateTimeLocal(editFormData.endTime) : null;
+      const startISO = parseDateAndTimeToISO(editFormData.startDate, editFormData.startTime);
+      const endISO = parseDateAndTimeToISO(editFormData.endDate, editFormData.endTime);
 
       const response = await fetch(`/api/entries/${editingEntry.id}`, {
         method: "PATCH",
@@ -245,34 +249,48 @@ const ProjectsList = ({
                   <label className="block text-sm font-medium text-text-secondary mb-2">
                     Start Time
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={editFormData.startTime}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        startTime: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={editFormData.startDate}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, startDate: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
+                    />
+                    <input
+                      type="time"
+                      value={editFormData.startTime}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, startTime: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
+                    />
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-text-secondary mb-2">
                     End Time
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={editFormData.endTime}
-                    onChange={(e) =>
-                      setEditFormData({
-                        ...editFormData,
-                        endTime: e.target.value,
-                      })
-                    }
-                    className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      type="date"
+                      value={editFormData.endDate}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, endDate: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
+                    />
+                    <input
+                      type="time"
+                      value={editFormData.endTime}
+                      onChange={(e) =>
+                        setEditFormData({ ...editFormData, endTime: e.target.value })
+                      }
+                      className="w-full px-4 py-3 bg-dark-elevated border border-dark-border rounded-lg text-text-primary focus:outline-none focus:border-primary transition-colors"
+                    />
+                  </div>
                 </div>
 
                 <div>

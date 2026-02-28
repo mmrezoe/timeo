@@ -2,14 +2,11 @@ import { useEffect, useState, useMemo } from "react";
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
 
 export default function Report() {
@@ -20,22 +17,10 @@ export default function Report() {
   const [selectedPeriod, setSelectedPeriod] = useState(7);
   const [selectedProjectIds, setSelectedProjectIds] = useState([]);
   const [showProjectFilter, setShowProjectFilter] = useState(false);
-  
-  // Comparison settings
-  const [comparisonType, setComparisonType] = useState("daily"); // daily, weekly, monthly, yearly
-  const [comparisonOffset, setComparisonOffset] = useState(1); // weeks/months/years ago
-  const [comparisonData, setComparisonData] = useState([]);
-  const [loadingComparison, setLoadingComparison] = useState(false);
 
   useEffect(() => {
     fetchReportData();
   }, [selectedPeriod]);
-
-  useEffect(() => {
-    if (comparisonType && comparisonOffset >= 0) {
-      fetchComparisonData();
-    }
-  }, [comparisonType, comparisonOffset, selectedPeriod, selectedProjectIds]);
 
   // Filter data based on selected projects
   const { filteredProjects, filteredWeekData, filteredTotalTime } = useMemo(() => {
@@ -185,109 +170,19 @@ export default function Report() {
     return `${mins}m`;
   };
 
-  const fetchComparisonData = async () => {
-    try {
-      setLoadingComparison(true);
-      const now = new Date();
-      const days = selectedPeriod;
-      
-      // Calculate comparison period start date based on type and offset
-      let comparisonStart = new Date(now);
-      let comparisonEnd = new Date(now);
-      
-      if (comparisonType === "daily") {
-        // Compare with N periods ago (each period = selectedPeriod days)
-        comparisonEnd.setDate(now.getDate() - (comparisonOffset * days));
-        comparisonStart.setDate(comparisonEnd.getDate() - days);
-      } else if (comparisonType === "weekly") {
-        // Compare with N weeks ago (same week days)
-        comparisonEnd.setDate(now.getDate() - (comparisonOffset * 7));
-        comparisonStart.setDate(comparisonEnd.getDate() - days);
-      } else if (comparisonType === "monthly") {
-        // Compare with N months ago (same month days)
-        comparisonEnd.setMonth(now.getMonth() - comparisonOffset);
-        comparisonStart = new Date(comparisonEnd);
-        comparisonStart.setDate(comparisonEnd.getDate() - days);
-      } else if (comparisonType === "yearly") {
-        // Compare with N years ago (same year days)
-        comparisonEnd.setFullYear(now.getFullYear() - comparisonOffset);
-        comparisonStart = new Date(comparisonEnd);
-        comparisonStart.setDate(comparisonEnd.getDate() - days);
-      }
-      
-      comparisonStart.setHours(0, 0, 0, 0);
-      comparisonEnd.setHours(0, 0, 0, 0);
-      
-      const comparisonHistoryData = [];
-      
-      // Fetch data for comparison period (same number of days as selected period)
-      for (let i = 0; i < days; i++) {
-        const date = new Date(comparisonStart);
-        date.setDate(comparisonStart.getDate() + i);
-        date.setHours(0, 0, 0, 0);
-
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
-
-        const response = await fetch(
-          `/api/entries?startDate=${date.toISOString()}&endDate=${nextDay.toISOString()}`,
-        );
-        const entries = await response.json();
-
-        let dayTotal = 0;
-        const dayProjects = {};
-
-        entries.forEach((entry) => {
-          // Filter by selected projects if any
-          if (selectedProjectIds.length > 0 && !selectedProjectIds.includes(entry.projectId)) {
-            return;
-          }
-
-          let duration = entry.duration || 0;
-          if (!duration && entry.start && entry.end) {
-            const startTime = new Date(entry.start);
-            const endTime = new Date(entry.end);
-            duration = Math.floor((endTime.getTime() - startTime.getTime()) / 60000);
-          }
-          dayTotal += duration;
-
-          if (!dayProjects[entry.projectId]) {
-            dayProjects[entry.projectId] = 0;
-          }
-          dayProjects[entry.projectId] += duration;
-        });
-
-        comparisonHistoryData.push({
-          date: date.toISOString().split("T")[0],
-          displayDate: date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            timeZone: "UTC",
-          }),
-          totalHours: Number((dayTotal / 60).toFixed(2)),
-          totalMinutes: dayTotal,
-          projects: dayProjects,
-        });
-      }
-
-      setComparisonData(comparisonHistoryData);
-    } catch (error) {
-      console.error("Error fetching comparison data:", error);
-      setComparisonData([]);
-    } finally {
-      setLoadingComparison(false);
-    }
-  };
-
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const originalHours = Number(payload[0].payload.totalHours);
+      const h = Math.floor(originalHours);
+      const m = Math.round((originalHours % 1) * 60);
+      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
       return (
         <div className="bg-dark-surface border border-dark-border rounded-lg p-4 shadow-premium">
           <p className="text-text-primary font-semibold mb-2">
             {payload[0].payload.displayDate}
           </p>
           <p className="text-accent-primary font-mono">
-            {payload[0].value} hours
+            {timeStr}
           </p>
         </div>
       );
@@ -299,20 +194,6 @@ export default function Report() {
     { value: 7, label: "7 Days" },
     { value: 30, label: "30 Days" },
     { value: 90, label: "90 Days" },
-  ];
-
-  const comparisonTypeOptions = [
-    { value: "daily", label: "روزانه", icon: "📅" },
-    { value: "weekly", label: "هفتگی", icon: "📆" },
-    { value: "monthly", label: "ماهانه", icon: "🗓️" },
-    { value: "yearly", label: "سالانه", icon: "📊" },
-  ];
-
-  const comparisonOffsetOptions = [
-    { value: 1, label: "1 دوره قبل" },
-    { value: 2, label: "2 دوره قبل" },
-    { value: 3, label: "3 دوره قبل" },
-    { value: 4, label: "4 دوره قبل" },
   ];
 
   return (
@@ -479,216 +360,6 @@ export default function Report() {
         </div>
       </div>
 
-      {/* Comparison Section */}
-      <div className="card-premium">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-1 h-8 bg-gradient-to-b from-accent-secondary to-emerald-400 rounded-full"></div>
-          <h2 className="text-2xl font-bold text-text-primary">
-            مقایسه عملکرد
-          </h2>
-        </div>
-
-        {/* Comparison Controls */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          {/* Comparison Type Selector */}
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              نوع مقایسه
-            </label>
-            <div className="flex items-center space-x-2">
-              {comparisonTypeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setComparisonType(option.value)}
-                  className={`flex-1 px-4 py-3 rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 ${
-                    comparisonType === option.value
-                      ? "bg-accent-primary text-white shadow-glow-sm"
-                      : "bg-dark-surface text-text-secondary hover:bg-dark-surface-hover border border-dark-border"
-                  }`}
-                >
-                  <span className="text-lg">{option.icon}</span>
-                  <span className="text-sm font-medium">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Comparison Offset Selector */}
-          <div className="md:w-48">
-            <label className="block text-sm font-medium text-text-secondary mb-2">
-              بازه زمانی
-            </label>
-            <select
-              value={comparisonOffset}
-              onChange={(e) => setComparisonOffset(Number(e.target.value))}
-              className="w-full px-4 py-3 rounded-lg bg-dark-surface text-text-primary border border-dark-border hover:bg-dark-surface-hover focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all"
-            >
-              {comparisonOffsetOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Comparison Chart */}
-        {loadingComparison ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent-primary"></div>
-          </div>
-        ) : comparisonData.length > 0 && filteredWeekData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={400}>
-            <LineChart
-              data={filteredWeekData.map((current, index) => {
-                const comparison = comparisonData[index] || null;
-                return {
-                  displayDate: current.displayDate,
-                  current: current.totalHours,
-                  comparison: comparison ? comparison.totalHours : null,
-                };
-              })}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3c" />
-              <XAxis
-                dataKey="displayDate"
-                stroke="#8b8b9a"
-                style={{ fontSize: "12px" }}
-              />
-              <YAxis
-                stroke="#8b8b9a"
-                style={{ fontSize: "12px" }}
-                label={{
-                  value: "Hours",
-                  angle: -90,
-                  position: "insideLeft",
-                  style: { fill: "#8b8b9a" },
-                }}
-              />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-dark-surface border border-dark-border rounded-lg p-4 shadow-premium">
-                        {payload.map((entry, index) => (
-                          <p
-                            key={index}
-                            className="text-sm mb-1"
-                            style={{
-                              color: entry.color,
-                            }}
-                          >
-                            <span className="font-semibold">{entry.name}:</span> {entry.value} hours
-                          </p>
-                        ))}
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Legend />
-              <Line
-                type="monotone"
-                dataKey="current"
-                stroke="#6366f1"
-                strokeWidth={3}
-                dot={{ fill: "#6366f1", strokeWidth: 2, r: 5 }}
-                activeDot={{ r: 8 }}
-                name="دوره فعلی"
-                connectNulls
-              />
-              <Line
-                type="monotone"
-                dataKey="comparison"
-                stroke="#10b981"
-                strokeWidth={3}
-                strokeDasharray="5 5"
-                dot={{ fill: "#10b981", strokeWidth: 2, r: 5 }}
-                activeDot={{ r: 8 }}
-                name={`دوره ${comparisonOffset} ${comparisonType === "daily" ? "روز" : comparisonType === "weekly" ? "هفته" : comparisonType === "monthly" ? "ماه" : "سال"} قبل`}
-                connectNulls
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-20 h-20 rounded-2xl bg-dark-elevated flex items-center justify-center mb-4">
-              <svg
-                className="w-10 h-10 text-text-tertiary"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-            <p className="text-text-secondary">
-              داده‌ای برای مقایسه موجود نیست
-            </p>
-          </div>
-        )}
-
-        {/* Comparison Stats */}
-        {!loadingComparison && comparisonData.length > 0 && filteredWeekData.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="bg-dark-elevated rounded-lg p-4 border border-dark-border">
-              <div className="text-text-tertiary text-sm mb-1">میانگین دوره فعلی</div>
-              <div className="text-2xl font-bold text-accent-primary font-mono">
-                {formatTime(
-                  Math.round(
-                    filteredWeekData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    filteredWeekData.length
-                  )
-                )}
-              </div>
-            </div>
-            <div className="bg-dark-elevated rounded-lg p-4 border border-dark-border">
-              <div className="text-text-tertiary text-sm mb-1">
-                میانگین دوره {comparisonOffset} {comparisonType === "daily" ? "روز" : comparisonType === "weekly" ? "هفته" : comparisonType === "monthly" ? "ماه" : "سال"} قبل
-              </div>
-              <div className="text-2xl font-bold text-accent-secondary font-mono">
-                {formatTime(
-                  Math.round(
-                    comparisonData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    comparisonData.length
-                  )
-                )}
-              </div>
-            </div>
-            <div className="bg-dark-elevated rounded-lg p-4 border border-dark-border">
-              <div className="text-text-tertiary text-sm mb-1">تغییر</div>
-              <div
-                className={`text-2xl font-bold font-mono ${
-                  (filteredWeekData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    filteredWeekData.length) >
-                  (comparisonData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    comparisonData.length)
-                    ? "text-accent-secondary"
-                    : "text-red-400"
-                }`}
-              >
-                {(
-                  ((filteredWeekData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    filteredWeekData.length -
-                    comparisonData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    comparisonData.length) /
-                    (comparisonData.reduce((sum, d) => sum + d.totalMinutes, 0) /
-                    comparisonData.length)) *
-                  100
-                ).toFixed(1)}
-                %
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {loading ? (
         <div className="space-y-6">
           {/* Loading Skeleton */}
@@ -802,6 +473,11 @@ export default function Report() {
             </div>
 
             {filteredWeekData.length > 0 ? (
+              (() => {
+                const realMaxHours = Math.max(0, ...filteredWeekData.map((d) => d.totalHours));
+                const axisMax = Math.max(1, Math.ceil(realMaxHours));
+                const yTicks = Array.from({ length: axisMax + 1 }, (_, i) => i);
+                return (
               <ResponsiveContainer width="100%" height={350}>
                 <LineChart data={filteredWeekData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3c" />
@@ -811,6 +487,8 @@ export default function Report() {
                     style={{ fontSize: "12px" }}
                   />
                   <YAxis
+                    domain={[0, axisMax]}
+                    ticks={yTicks}
                     stroke="#8b8b9a"
                     style={{ fontSize: "12px" }}
                     label={{
@@ -831,6 +509,8 @@ export default function Report() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+                );
+              })()
             ) : (
               <div className="flex flex-col items-center justify-center py-16">
                 <div className="w-20 h-20 rounded-2xl bg-dark-elevated flex items-center justify-center mb-4">

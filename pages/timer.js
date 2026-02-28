@@ -186,6 +186,7 @@ export default function Timer() {
         if (finalTotalTime > 0) {
           historyData.push({
             date: date,
+            logicalDay,
             dateLabel: getDateLabel(date),
             projects: Object.values(projectsMap),
             totalTime: finalTotalTime,
@@ -207,6 +208,18 @@ export default function Timer() {
     const [y, m, d] = logicalDay.split("-").map(Number);
     const dateObj = new Date(y, m - 1, d);
     return dateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  };
+
+  // Single source: format logical day (YYYY-MM-DD) for display. Avoids new Date() / timezone drift.
+  const formatLogicalDayLong = (logicalDay) => {
+    if (!logicalDay) return null;
+    const [y, m, d] = logicalDay.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  };
+  const formatLogicalDayShort = (logicalDay) => {
+    if (!logicalDay) return null;
+    const [y, m, d] = logicalDay.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   };
 
   const formatTimeHistory = (seconds) => {
@@ -418,11 +431,14 @@ export default function Timer() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
+      {/* Page Header: single main date from todayLogicalDay only (no new Date() / no fallback) */}
       <div className="text-center">
         <h1 className="text-4xl font-bold text-text-primary mb-3">Timer</h1>
         <p className="text-text-secondary text-lg">
           Track your time with precision
+        </p>
+        <p className="text-text-primary text-2xl font-semibold mt-4" title={todayLogicalDay || undefined}>
+          {todayLogicalDay ? formatLogicalDayLong(todayLogicalDay) : "—"}
         </p>
       </div>
 
@@ -876,13 +892,8 @@ export default function Timer() {
                 d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
               />
             </svg>
-            <span>
-              {new Date().toLocaleDateString("en-US", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
+            <span title={todayLogicalDay || undefined}>
+              {todayLogicalDay ? formatLogicalDayShort(todayLogicalDay) : "—"}
             </span>
           </div>
         </div>
@@ -939,9 +950,12 @@ export default function Timer() {
               <div key={day.date.toISOString()} className="space-y-4 animate-smooth-slide-up">
                 <div className="flex items-center space-x-3">
                   <h3 className="text-xl font-semibold text-text-primary">{day.dateLabel}</h3>
-                  {day.dateLabel !== "Yesterday" && (
+                  {day.dateLabel !== "Yesterday" && day.logicalDay && (
                     <span className="text-text-tertiary text-sm">
-                      {new Date(day.date).toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })}
+                      {(() => {
+                        const [y, m, d] = day.logicalDay.split("-").map(Number);
+                        return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                      })()}
                     </span>
                   )}
                   <div className="flex-1 h-px bg-dark-border" />
